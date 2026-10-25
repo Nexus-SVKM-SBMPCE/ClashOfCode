@@ -9,6 +9,7 @@ __pycache__/
 *.db
 tests
 code_context.txt
+surface_context.txt
 
 # Node & Frontend
 node_modules/
