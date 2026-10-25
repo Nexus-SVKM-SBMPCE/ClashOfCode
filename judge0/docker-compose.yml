@@ -1,0 +1,47 @@
+services:
+  server:
+    image: judge0/judge0:1.13.0
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    ports:
+      - "2358:2358"
+    privileged: true
+    depends_on:
+      - db
+      - redis
+    restart: always
+
+  workers:
+    image: judge0/judge0:1.13.0
+    command: ["./scripts/workers"]
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    privileged: true
+    depends_on:
+      - db
+      - redis
+    restart: always
+
+  db:
+    image: postgres:13.0
+    environment:
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: Judge0LocalSecret2026
+      POSTGRES_DB: judge0
+    volumes:
+      - judge0-db-data:/var/lib/postgresql/data
+    restart: always
+
+  redis:
+    image: redis:6.0
+    command: [
+      "bash", "-c",
+      'docker-entrypoint.sh --appendonly yes --requirepass "Judge0RedisSecret2026"'
+    ]
+    volumes:
+      - judge0-redis-data:/data
+    restart: always
+
+volumes:
+  judge0-db-data:
+  judge0-redis-data:
