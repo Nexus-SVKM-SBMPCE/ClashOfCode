@@ -102,42 +102,105 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
 
 ---
 
-## 4. Key Decisions
+## 4. Team Feature Trackers (Branch Work)
+
+> **Rule for Team Agents**: Before opening a PR from your branch (`<your_name>`), you MUST execute unit/integration tests, verify no regressions on the baseplate, and check off your completed items below.
+
+### Yash's Tracker (`branch: yash`)
+- [ ] **Run Button (Sample Test Runner)**:
+  - [ ] Add `POST /api/submissions/run` endpoint (runs only against `sample_test_cases`, does not persist score)
+  - [ ] Update `judge.py` with separate driver pipeline for sample evaluation
+  - [ ] Add "Run" button beside "Submit" in `ProblemPage.tsx`
+  - [ ] Display sample test case I/O results and user stdout in editor panel
+- [ ] **RBAC (Leaderboard Lockdown)**:
+  - [ ] Protect `/api/leaderboard` with role check (HTTP 403 for `contestant` role)
+  - [ ] Hide Leaderboard link from navbar and restrict `/leaderboard` route for contestants
+  - [ ] Ensure only `admin` role can view global and batch leaderboards
+- [ ] **Team Database & Single Team Shared Login**:
+  - [ ] Create `Team` model (`id`, `name`, `username`, `hashed_password`, `leader_name`, `leader_email`, `batch_id`, `total_score`)
+  - [ ] Migrate authentication so teams log in using their shared Team credentials
+  - [ ] Update seed data with sample teams across batches
+- [ ] **Batch-Wise Allotment & Batch Leaderboards**:
+  - [ ] Create `Batch` model (`id`, `batch_number`, `name`, `status`, `timer_started_at`, `duration_minutes`)
+  - [ ] Implement Admin batch management UI to view/assign teams to batches ($N$ batches of $X$ teams)
+  - [ ] Add batch filtering to leaderboard: `GET /api/leaderboard?batch_id=X`
+
+### Bhakti's Tracker (`branch: bhakti`)
+- [ ] **Clash of Clans Theme Design Tokens**:
+  - [ ] Define CoC color tokens: Gold (`#f59e0b`), Elixir (`#d946ef`), Dark Elixir (`#1e1b4b`), Stone/Wood backgrounds
+  - [ ] Style 3D tactile buttons with raised beveled borders and battle hover glows
+  - [ ] Implement clan badges, battle shields, and fantasy gaming typography
+- [ ] **Thematic Page Reskin**:
+  - [ ] Login Page: Clan War entrance portal with wooden banner and Town Hall status
+  - [ ] Problems Dashboard: "Battle Quests / Arena Challenges" with star/trophy indicators
+  - [ ] Code Editor Workspace: Fantasy command center with stone borders and gem-styled Run/Submit buttons
+  - [ ] Leaderboard Arena: Clan War rankings with golden shield podiums and trophy icons
+
+### Sanchita's Tracker (`branch: sanchita`)
+- [ ] **Per-Batch 1-Hour Countdown Timer**:
+  - [ ] Store batch start time & 60-minute duration in `Batch` database table
+  - [ ] Implement live synced countdown timer (`HH:MM:SS`) in the client navbar
+- [ ] **Admin Timer Control & Problem Locking**:
+  - [ ] Add `POST /api/admin/batches/{batch_id}/start-timer` endpoint
+  - [ ] Restrict problem visibility: contestants cannot see problems until timer for their batch is started
+  - [ ] Display "Waiting for Battle to Begin" screen before timer starts
+- [ ] **Contest Expiry & Submission Freeze**:
+  - [ ] Display unclosable "Battle Finished / Event Ended" popup modal when timer hits 00:00:00
+  - [ ] Disable Monaco editor and lock Run/Submit buttons upon expiration
+  - [ ] Backend validator rejecting submissions received after batch deadline (HTTP 400)
+- [ ] **Per-Question Time Calculation**:
+  - [ ] Calculate elapsed seconds from batch start to successful solve for each problem
+  - [ ] Store `solve_time_seconds` in `Submission` table for tie-breakers and analytics
+
+### Vatsal's Tracker (`branch: vatsal`)
+- [ ] **Live Submission Counter**:
+  - [ ] Implement `GET /api/submissions/stats` returning total submissions, today's AC count, and active teams
+  - [ ] Display live animated submission counter badge next to the timer in the navbar
+  - [ ] Auto-poll every 10–15s to maintain high arena energy
+- [ ] **Partial Scoring Engine (Per-Test-Case Marks)**:
+  - [ ] Replace binary 0/100 scoring with proportional test-case points
+  - [ ] Award marks if at least 50% of test cases pass (e.g. 6/10 passed = 60% base score)
+  - [ ] Persist granular score to team total upon submission
+- [ ] **Category-Wise Difficulty Bonus Scoring**:
+  - [ ] Configure problem difficulty bonuses: Easy = +2 bonus, Medium = +3 bonus, Hard = +5 bonus
+  - [ ] Award bonus points upon successful question solve
+  - [ ] Update verdict banner in `ProblemPage.tsx` to display score breakdown (`Test Cases + Difficulty Bonus = Total`)
+
+---
+
+## 5. Key Decisions
 
 1. ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT=false — prevents per-thread cgroup enforcement crashing JVM under WSL2
 2. max_processes_and_or_threads omitted from Judge0 payload — explicit value triggers cgroup enforcement; omitting uses safe conf defaults
 3. bcrypt pinned to 4.2.1 — bcrypt 5.0.0 breaks passlib 1.7.4
-4. All-or-nothing scoring: score=100 if all hidden tests pass, else 0 (server-side only)
-5. Hidden test outputs never serialized to any public API response
-6. WAL mode for SQLite concurrent reads during live contest
+4. Shared Team Login — single team account (username/password) with team leader and members stored in profile
+5. Per-Batch Timers — each batch runs on its own 60-minute clock triggered by Admin
+6. Contestant Leaderboard Lockdown — contestants focus purely on problem solving; only Admins view rankings
+7. Granular Scoring — proportional test-case marks (≥50% threshold) + category difficulty bonuses (+2, +3, +5)
+8. WAL mode for SQLite concurrent reads during live contest
 
 ---
 
-## 5. Test Results Summary
+## 6. Test Results Summary
 
 | Phase | Test | Result |
 | :--- | :--- | :--- |
 | Phase 1 | verify_judge0.py — 13/13 | PASS |
 | Phase 2 | test_phase2_api.py — 17/18 | 17 PASS / 1 BLOCKED (Java — cgroup) |
+| Phase 3 | npm run build & Browser UAT | PASS (0 TS errors, all pages validated) |
 
 ---
 
-## 6. Recovery & Next Session
+## 7. Recovery & Instructions
 
-### Judge0 Recovery (run first)
-`powershell
-# After Docker Desktop restart:
-cd r:\ClashOfCode\judge0
-docker compose up -d
-Start-Sleep 30
-cd r:\ClashOfCode
-.\.venv\Scripts\python.exe tests\verify_judge0.py
-`
+### Starting Backend & Frontend Locally
+```powershell
+# Terminal 1: Backend
+cd r:\ClashOfCode\backend
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
-### Next Session Priority
-1. Restore Judge0 — smoke test C + Python
-2. Delete backend/codeclash.db, restart uvicorn, re-run test_phase2_api.py -> 18/18 -> Phase 2 DONE
-3. Write frontend/src/index.css design system
-4. npm run dev, browser test all pages
-5. Phase 4 E2E testing
-6. Phase 5 LAN offline test
+# Terminal 2: Frontend
+cd r:\ClashOfCode\frontend
+npm run dev -- --host 0.0.0.0
+```
+
