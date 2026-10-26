@@ -153,18 +153,33 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [ ] Store `solve_time_seconds` in `Submission` table for tie-breakers and analytics
 
 ### Vatsal's Tracker (`branch: vatsal`)
-- [ ] **Live Submission Counter**:
-  - [ ] Implement `GET /api/submissions/stats` returning total submissions, today's AC count, and active teams
-  - [ ] Display live animated submission counter badge next to the timer in the navbar
-  - [ ] Auto-poll every 10–15s to maintain high arena energy
-- [ ] **Partial Scoring Engine (Per-Test-Case Marks)**:
-  - [ ] Replace binary 0/100 scoring with proportional test-case points
-  - [ ] Award marks if at least 50% of test cases pass (e.g. 6/10 passed = 60% base score)
-  - [ ] Persist granular score to team total upon submission
-- [ ] **Category-Wise Difficulty Bonus Scoring**:
-  - [ ] Configure problem difficulty bonuses: Easy = +2 bonus, Medium = +3 bonus, Hard = +5 bonus
-  - [ ] Award bonus points upon successful question solve
-  - [ ] Update verdict banner in `ProblemPage.tsx` to display score breakdown (`Test Cases + Difficulty Bonus = Total`)
+- [x] **Live Submission Counter**:
+  - [x] Implement `GET /api/submissions/stats` returning total submissions, today's AC count, and active teams (distinct teams submitting in last 15 min); aggregates only, auth required
+  - [x] Display live animated submission counter badge next to the timer slot in the navbar (`LiveSubmissionCounter.tsx`, bumps on increase)
+  - [x] Auto-poll every 12s (`hooks/useSubmissionStats.ts`), paused while tab hidden, instant refresh after own submit
+- [x] **Partial Scoring Engine (Per-Test-Case Marks)**:
+  - [x] Replace binary 0/100 scoring with per-test-case marks (`app/scoring.py`, `MARKS_PER_TEST_CASE`=10, env-configurable)
+  - [x] Award marks only if at least 50% of test cases pass (`PARTIAL_THRESHOLD`=0.5); CE = 0
+  - [x] Persist `test_score`, `bonus_points`, `tests_passed`, `tests_total` on `Submission` (auto `ALTER TABLE` migration for existing DBs); leaderboard sums best score per problem
+- [x] **Category-Wise Difficulty Bonus Scoring**:
+  - [x] Easy = +2, Medium = +3, Hard = +5 (`DIFFICULTY_BONUS` in `config.py`); seed mix now 2 easy / 2 medium / 1 hard (Two Sum→medium, Max Subarray→hard, synced on startup)
+  - [x] Bonus awarded only on full solve (all tests AC) via Submit — never on sample runs
+  - [x] Verdict banner shows `X/Y tests passed · test marks + bonus = total pts`; submissions table shows Tests/Score; problems list shows solve bonus + scoring rules
+- [x] **Audit fixes**: `alert()` → toasts on submit errors; problem page no longer stuck on "Loading…" for 404/offline; language switch keeps per-language drafts; Ctrl+Enter submits; problems/leaderboard pages handle API errors (incl. 403)
+- [x] **Responsive / performance / offline audit (2026-10-26)**:
+  - [x] CRITICAL offline fix: Monaco editor was fetched from cdn.jsdelivr.net at runtime and fonts from Google Fonts. Both are now bundled (`src/monacoSetup.ts`, `@fontsource/*`); verified 0 external requests
+  - [x] Mobile navbar overflowed offscreen (no Leaderboard / Sign Out on phones). Now a 2-row layout ≤900px; 0px horizontal overflow at 320/390/768/1024/1920 on all pages
+  - [x] Phone workspace stacks and scrolls (editor ≥420px tall); tables scroll inside their cards; `100dvh` for mobile browser bars
+  - [x] Judge0 down: backend now stops at the first IE instead of timing out on every test (~30s → 2.5s); UI says "Judge error — not your code" instead of "0 pts"
+  - [x] Leaderboard medals only for teams with points; page title set; WCAG AA contrast fixes
+  - [x] Perf: editor lazy-loaded (main JS 501→327 KB); CLS phone 0.10→0.00, PC 0.11→0.01; LCP 278 ms PC / 1.3 s phone (4x CPU); Lighthouse a11y 95, best practices 100
+- [x] **Frontend redesign — "contest judge you work inside" (2026-10-26, frontend only)**:
+  - [x] New token-based design system (`src/index.css`, documented in `frontend/DESIGN.md`): graphite surfaces, hairline seams, lime accent for action/focus only, verdict colours, bundled Inter + JetBrains Mono
+  - [x] ICPC balloon signature: problems lettered A–E with per-problem colours that fill when solved (`lib/arena.ts`, `components/Balloon.tsx`)
+  - [x] Workspace: problem rail, resizable statement/editor split (drag + arrow keys), Monaco "clash" theme, docked verdict strip (tests bar, score breakdown, collapsible compile output), copy buttons on samples; phones get a Problem/Code switch
+  - [x] Problems, Leaderboard (YOU row, podium marks only with points), Login (redirects when signed in — previously stayed on /login) redesigned; inline SVG icons replace emoji
+  - [x] Verified: build OK, Lighthouse a11y 100 / best practices 100 (mobile workspace), 0 external requests, no page overflow 320–1920px. No backend/API/auth changes. NOTE: supersedes the Clash-of-Clans reskin direction in Bhakti's tracker — coordinate before merging.
+- Verification: scoring unit asserts + TestClient integration (mocked Judge0, old-schema migration) ALL PASS; `npm run build` exit 0
 
 ---
 
