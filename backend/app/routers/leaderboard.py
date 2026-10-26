@@ -1,6 +1,8 @@
 """
 Leaderboard router: server-side score aggregation.
-Ranks by: total score DESC, then fewest submissions DESC, then earliest AC time ASC.
+Score per problem = best granular score across the team's submissions
+(test-case marks + difficulty bonus, see app/scoring.py).
+Ranks by: total score DESC, solved count DESC, then earliest time the final score was reached ASC.
 """
 from typing import Any, Dict, List, Optional
 from sqlmodel import Session, select, func
@@ -40,8 +42,15 @@ def get_leaderboard(
         ).all()
 
         solved_problems: Dict[int, dict] = {}
+        best_score: Dict[int, dict] = {}
         for sub in user_subs:
             pid = sub.problem_id
+            cur = best_score.get(pid)
+            if sub.score > 0 and (
+                cur is None or sub.score > cur["score"]
+                or (sub.score == cur["score"] and sub.created_at < cur["time"])
+            ):
+                best_score[pid] = {"score": sub.score, "time": sub.created_at}
             if sub.verdict == "AC":
                 # Keep earliest AC per problem
                 if pid not in solved_problems or sub.created_at < solved_problems[pid]["time"]:
@@ -50,11 +59,15 @@ def get_leaderboard(
                         "runtime_ms": sub.runtime_ms,
                     }
 
-        total_score = len(solved_problems) * 100
+        total_score = sum(v["score"] for v in best_score.values())
         total_submissions = len(user_subs)
         last_ac_time = (
             max(v["time"] for v in solved_problems.values()).isoformat()
             if solved_problems else None
+        )
+        last_score_time = (
+            max(v["time"] for v in best_score.values()).isoformat()
+            if best_score else None
         )
 
         rows.append({
@@ -65,6 +78,7 @@ def get_leaderboard(
             "solved_count": len(solved_problems),
             "total_submissions": total_submissions,
             "last_ac_time": last_ac_time,
+            "_last_score_time": last_score_time,
         })
 
     # Sort: score DESC, solved DESC, last AC time ASC (earlier is better)
@@ -72,12 +86,13 @@ def get_leaderboard(
         key=lambda r: (
             -r["total_score"],
             -r["solved_count"],
-            r["last_ac_time"] or "9999",
+            r["_last_score_time"] or "9999",
         )
     )
 
     # Assign ranks
     for i, row in enumerate(rows):
         row["rank"] = i + 1
+        del row["_last_score_time"]
 
     return rows
