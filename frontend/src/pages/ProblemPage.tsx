@@ -5,6 +5,8 @@ import remarkGfm from 'remark-gfm';
 import Editor from '@monaco-editor/react';
 import { getProblem, submitCode, getMySubmissions } from '../api';
 import type { ProblemDetail, Submission } from '../api';
+import { useCountdownTimer } from '../useCountdownTimer';
+import BattleFinishedModal from '../BattleFinishedModal';
 
 const LANGUAGES = [
   { id: 'python', label: 'Python 3.8', ext: 'py' },
@@ -72,6 +74,9 @@ function fmtMemory(kb: number | null) {
 
 export default function ProblemPage() {
   const { slug } = useParams<{ slug: string }>();
+  const { status: timerStatus } = useCountdownTimer();
+  const isContestEnded = timerStatus === 'COMPLETED';
+
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [lang, setLang] = useState('python');
   const [code, setCode] = useState(STARTERS['python']);
@@ -92,7 +97,7 @@ export default function ProblemPage() {
   };
 
   const submit = useCallback(async () => {
-    if (!slug || submitting) return;
+    if (!slug || submitting || isContestEnded) return;
     setSubmitting(true);
     setLastResult(null);
     try {
@@ -104,12 +109,13 @@ export default function ProblemPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [slug, lang, code, submitting]);
+  }, [slug, lang, code, submitting, isContestEnded]);
 
   if (!problem) return <div className="page-loading">Loading problem…</div>;
 
   return (
     <div className="problem-layout">
+      {isContestEnded && <BattleFinishedModal />}
       {/* Left: problem statement */}
       <div className="problem-statement-panel">
         <div className="problem-header">
@@ -171,11 +177,14 @@ export default function ProblemPage() {
           </select>
           <button
             id="submit-btn"
-            className="btn-submit"
+            className={`btn-submit ${isContestEnded ? 'btn-disabled' : ''}`}
             onClick={submit}
-            disabled={submitting}
+            disabled={submitting || isContestEnded}
+            title={isContestEnded ? 'Contest has ended. Submissions are closed.' : undefined}
           >
-            {submitting ? (
+            {isContestEnded ? (
+              '⏱ Contest Ended'
+            ) : submitting ? (
               <span className="submitting-text"><span className="spinner" />Judging…</span>
             ) : (
               '▶ Submit'
@@ -198,6 +207,7 @@ export default function ProblemPage() {
               lineNumbers: 'on',
               folding: true,
               tabSize: 4,
+              readOnly: isContestEnded,
             }}
           />
         </div>

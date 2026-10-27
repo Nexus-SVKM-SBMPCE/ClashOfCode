@@ -156,11 +156,13 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] `isBatchLocked(err)` helper in `api.ts` for clean 423 detection
   - [x] CSS for WaitingScreen + BatchGate spinner added to `index.css`
   - [x] TypeScript: `tsc --noEmit --skipLibCheck` exits 0; Python: all syntax OK
-- [ ] **Contest Expiry & Submission Freeze** *(Phase 2)*:
-  - [ ] Display unclosable "Battle Finished / Event Ended" popup modal when timer hits 00:00:00
-  - [ ] Disable Monaco editor and lock Run/Submit buttons upon expiration
-  - [ ] Backend validator rejecting submissions received after batch deadline (HTTP 400)
-- [ ] **Per-Question Time Calculation** *(Phase 2)*:
+- [x] **Contest Expiry & Submission Freeze** *(Phase 3 — COMPLETE)*:
+  - [x] Created `frontend/src/BattleFinishedModal.tsx` — unclosable "Battle Finished" modal rendered on `COMPLETED` timer status
+  - [x] Updated `frontend/src/pages/ProblemPage.tsx` — Monaco editor set to `readOnly: true`, Submit button disabled with "⏱ Contest Ended"
+  - [x] Styled modal in `frontend/src/index.css` with Clash of Clans dark fantasy overlay, gold border, and red status badge
+  - [x] Backend validator `_validate_submission_deadline` in `backend/app/routers/submissions.py` — rejects submissions after `timer_started_at + duration_minutes` or when `COMPLETED` with HTTP 400 "Submission deadline passed"
+  - [x] Test suite: Backend pytest `backend/tests/test_contest_expiry.py` (3/3 passed) & Frontend Vitest `frontend/src/ProblemPage.test.tsx` (2/2 passed)
+- [ ] **Per-Question Time Calculation** *(Phase 4)*:
   - [ ] Calculate elapsed seconds from batch start to successful solve for each problem
   - [ ] Store `solve_time_seconds` in `Submission` table for tie-breakers and analytics
 

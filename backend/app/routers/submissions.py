@@ -5,7 +5,7 @@ Submissions router:
   GET  /api/submissions          — list own submissions (admin sees all)
 """
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,7 +16,16 @@ from app.auth import get_current_user
 from app.config import SUPPORTED_LANGUAGES
 from app.database import get_session
 from app.judge import evaluate_submission, STATUS_CE
-from app.models import Problem, Submission, TestCase, User
+from app.models import (
+    Batch,
+    Problem,
+    Submission,
+    TestCase,
+    User,
+    BATCH_STATUS_ACTIVE,
+    BATCH_STATUS_COMPLETED,
+    BATCH_STATUS_NOT_STARTED,
+)
 
 router = APIRouter(prefix="/api/submissions", tags=["submissions"])
 
@@ -76,6 +85,43 @@ def _to_response(sub: Submission, problem_slug: str, include_ce: bool = True) ->
     )
 
 
+def _validate_submission_deadline(session: Session, user: User) -> Optional[Batch]:
+    """
+    Validate that the submission is within the batch's active contest window.
+    Rejects submissions received after `timer_started_at + duration_minutes`
+    or when batch status is COMPLETED with HTTP 400 Bad Request:
+    'Submission deadline passed'.
+    """
+    now = datetime.now(timezone.utc)
+
+    # Fetch active batch first, fallback to the latest batch
+    batch = session.exec(
+        select(Batch).where(Batch.status == BATCH_STATUS_ACTIVE)
+    ).first()
+    if batch is None:
+        batch = session.exec(select(Batch).order_by(Batch.id.desc())).first()
+
+    if batch is not None:
+        if batch.status == BATCH_STATUS_COMPLETED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Submission deadline passed",
+            )
+
+        if batch.timer_started_at is not None:
+            started = batch.timer_started_at
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            deadline = started + timedelta(minutes=batch.duration_minutes)
+            if now > deadline:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Submission deadline passed",
+                )
+
+    return batch
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -85,6 +131,9 @@ def create_submission(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> SubmissionResponse:
+    # 0. Validate batch deadline
+    batch = _validate_submission_deadline(session, current_user)
+
     # Resolve problem
     prob = session.exec(
         select(Problem).where(Problem.slug == body.problem_slug, Problem.is_visible == True)  # noqa: E712
@@ -108,6 +157,7 @@ def create_submission(
     sub = Submission(
         user_id=current_user.id,
         problem_id=prob.id,
+        batch_id=batch.id if batch else None,
         language=body.language,
         source_code=body.source_code,
         status="judging",
@@ -164,6 +214,12 @@ def create_submission(
             final_verdict = verdict
 
     score = 100 if final_verdict == "AC" else 0
+
+    if final_verdict == "AC" and batch and batch.timer_started_at:
+        started = batch.timer_started_at
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        sub.solve_time_seconds = max(0, int((datetime.now(timezone.utc) - started).total_seconds()))
 
     # Persist results
     sub.status       = "done"
