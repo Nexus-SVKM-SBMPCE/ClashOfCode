@@ -7,6 +7,9 @@ __pycache__/
 *$py.class
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 tests
 code_context.txt
 surface_context.txt
