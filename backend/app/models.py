@@ -30,6 +30,27 @@ def init_db():
             __import__("sqlalchemy").text("PRAGMA journal_mode=WAL")
         )
         session.commit()
+    _migrate_columns()
+
+
+# Columns added after the initial schema. create_all() never alters existing
+# tables, so add them in place for databases created by older builds.
+_SUBMISSION_COLUMNS = {
+    "test_score": "INTEGER NOT NULL DEFAULT 0",
+    "bonus_points": "INTEGER NOT NULL DEFAULT 0",
+    "tests_passed": "INTEGER NOT NULL DEFAULT 0",
+    "tests_total": "INTEGER NOT NULL DEFAULT 0",
+}
+
+
+def _migrate_columns():
+    from sqlalchemy import inspect, text
+    existing = {c["name"] for c in inspect(engine).get_columns("submissions")}
+    with engine.begin() as conn:
+        for name, ddl in _SUBMISSION_COLUMNS.items():
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE submissions ADD COLUMN {name} {ddl}"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_submissions_created_at ON submissions (created_at)"))
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +121,11 @@ class Submission(SQLModel, table=True):
 
     # Aggregate verdict across all test cases
     verdict: Optional[str] = None               # "AC" | "WA" | "TLE" | "MLE" | "CE" | "RE" | "IE"
-    score: int = Field(default=0)               # 0 or 100 per problem (all-or-nothing)
+    score: int = Field(default=0)               # test_score + bonus_points (see app/scoring.py)
+    test_score: int = Field(default=0)          # marks from passed test cases
+    bonus_points: int = Field(default=0)        # difficulty bonus, only on full AC
+    tests_passed: int = Field(default=0)
+    tests_total: int = Field(default=0)
     runtime_ms: Optional[float] = None
     memory_kb: Optional[int] = None
     test_results: Optional[str] = None         # JSON — hidden detail per test run

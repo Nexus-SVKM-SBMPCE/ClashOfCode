@@ -27,7 +27,7 @@ PROBLEMS = [
     {
         "slug": "two-sum",
         "title": "Two Sum",
-        "difficulty": "easy",
+        "difficulty": "medium",
         "time_limit_sec": 2.0,
         "memory_limit_kb": 262144,
         "statement": """## Two Sum
@@ -186,7 +186,7 @@ A single integer — the 1-based index of `T`, or `-1`.
     {
         "slug": "max-subarray",
         "title": "Maximum Subarray Sum",
-        "difficulty": "medium",
+        "difficulty": "hard",
         "time_limit_sec": 2.0,
         "memory_limit_kb": 262144,
         "statement": """## Maximum Subarray Sum (Kadane's Algorithm)
@@ -244,6 +244,10 @@ def seed(session: Session) -> None:
     # Problems + test cases
     for p_data in PROBLEMS:
         exists = session.exec(select(Problem).where(Problem.slug == p_data["slug"])).first()
+        if exists and exists.difficulty != p_data["difficulty"]:
+            # Keep the 2 easy / 2 medium / 1 hard contest mix on older databases
+            exists.difficulty = p_data["difficulty"]
+            session.add(exists)
         if not exists:
             prob = Problem(
                 slug=p_data["slug"],

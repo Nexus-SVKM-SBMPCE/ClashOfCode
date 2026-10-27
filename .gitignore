@@ -38,3 +38,13 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Local AI agent skills / tool config (not part of Code Clash)
+/.agent/
+/.agents/
+/.claude/
+/.codex/
+/.gemini/
+/.impeccable/
+/.opencode/
+/PRODUCT.md

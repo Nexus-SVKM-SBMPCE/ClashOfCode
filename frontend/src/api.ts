@@ -8,11 +8,11 @@ export const api = axios.create({ baseURL: BASE_URL });
 export const demoMode = { enabled: false };
 
 const MOCK_PROBLEMS = [
-  { id: 1, slug: 'two-sum', title: 'Two Sum', difficulty: 'easy', time_limit_sec: 2, memory_limit_kb: 262144 },
+  { id: 1, slug: 'two-sum', title: 'Two Sum', difficulty: 'medium', time_limit_sec: 2, memory_limit_kb: 262144 },
   { id: 2, slug: 'fibonacci', title: 'Fibonacci Number', difficulty: 'easy', time_limit_sec: 2, memory_limit_kb: 262144 },
   { id: 3, slug: 'palindrome-check', title: 'Palindrome Check', difficulty: 'easy', time_limit_sec: 2, memory_limit_kb: 262144 },
   { id: 4, slug: 'binary-search', title: 'Binary Search', difficulty: 'medium', time_limit_sec: 2, memory_limit_kb: 262144 },
-  { id: 5, slug: 'max-subarray', title: 'Maximum Subarray Sum', difficulty: 'medium', time_limit_sec: 2, memory_limit_kb: 262144 },
+  { id: 5, slug: 'max-subarray', title: 'Maximum Subarray Sum', difficulty: 'hard', time_limit_sec: 2, memory_limit_kb: 262144 },
 ];
 
 const MOCK_PROBLEM_DETAIL: Record<string, object> = {
@@ -97,12 +97,23 @@ export interface Submission {
   language: string;
   status: string;
   verdict: string | null;
-  score: number;
+  score: number;            // test_score + bonus_points
+  test_score: number;       // marks from passed test cases (0 if under 50% passed)
+  bonus_points: number;     // difficulty bonus, only on full AC
+  tests_passed: number;
+  tests_total: number;
   runtime_ms: number | null;
   memory_kb: number | null;
   compile_error: string | null;
   created_at: string;
   judged_at: string | null;
+}
+
+export interface SubmissionStats {
+  total_submissions: number;
+  accepted_today: number;
+  active_teams: number;
+  server_time: string;
 }
 
 export interface LeaderboardEntry {
@@ -158,15 +169,23 @@ export const getProblem = (slug: string) => {
 export const submitCode = async (problem_slug: string, language: string, source_code: string) => {
   if (demoMode.enabled) {
     await delay(2000); // simulate judge execution
+    // Simulated verdict only: Demo mode never invents points (score fields stay 0);
+    // the UI labels these results as simulated.
+    const total = 5;
+    const passed = Math.random() < 0.6 ? total : 3;
     const sub: Submission = {
       id: ++mockSubId,
       problem_slug,
       language,
       status: 'done',
-      verdict: 'AC',
-      score: 100,
+      verdict: passed === total ? 'AC' : 'WA',
+      score: 0,
+      test_score: 0,
+      bonus_points: 0,
+      tests_passed: passed,
+      tests_total: total,
       runtime_ms: Math.random() * 200 + 50,
-      memory_kb: Math.random() * 5000 + 8000,
+      memory_kb: Math.round(Math.random() * 5000 + 8000),
       compile_error: null,
       created_at: new Date().toISOString(),
       judged_at: new Date().toISOString(),
@@ -176,6 +195,19 @@ export const submitCode = async (problem_slug: string, language: string, source_
     return mockResp(sub);
   }
   return api.post<Submission>('/api/submissions', { problem_slug, language, source_code });
+};
+
+export const getSubmissionStats = () => {
+  if (demoMode.enabled) {
+    const mine = Object.values(mockSubmissions).flat() as Submission[];
+    return mockResp<SubmissionStats>({
+      total_submissions: 37 + mine.length,
+      accepted_today: 12 + mine.filter((s) => s.verdict === 'AC').length,
+      active_teams: 5,
+      server_time: new Date().toISOString(),
+    });
+  }
+  return api.get<SubmissionStats>('/api/submissions/stats');
 };
 
 export const getMySubmissions = (problem_slug?: string) => {
