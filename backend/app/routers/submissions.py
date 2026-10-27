@@ -67,6 +67,7 @@ class SubmissionResponse(BaseModel):
     compile_error: Optional[str]    # only for CE on own submission
     created_at: str
     judged_at: Optional[str]
+    solve_time_seconds: Optional[int] = None
 
 
 def _to_response(sub: Submission, problem_slug: str, include_ce: bool = True) -> SubmissionResponse:
@@ -82,6 +83,7 @@ def _to_response(sub: Submission, problem_slug: str, include_ce: bool = True) ->
         compile_error=sub.compile_error if include_ce else None,
         created_at=sub.created_at.isoformat(),
         judged_at=sub.judged_at.isoformat() if sub.judged_at else None,
+        solve_time_seconds=sub.solve_time_seconds,
     )
 
 
@@ -215,11 +217,17 @@ def create_submission(
 
     score = 100 if final_verdict == "AC" else 0
 
-    if final_verdict == "AC" and batch and batch.timer_started_at:
-        started = batch.timer_started_at
-        if started.tzinfo is None:
-            started = started.replace(tzinfo=timezone.utc)
-        sub.solve_time_seconds = max(0, int((datetime.now(timezone.utc) - started).total_seconds()))
+    if final_verdict == "AC":
+        if batch and batch.timer_started_at:
+            started = batch.timer_started_at
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            created = sub.created_at
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            sub.solve_time_seconds = max(0, int((created - started).total_seconds()))
+        else:
+            sub.solve_time_seconds = 0
 
     # Persist results
     sub.status       = "done"

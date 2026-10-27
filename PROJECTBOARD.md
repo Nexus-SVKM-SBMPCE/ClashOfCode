@@ -162,9 +162,11 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Styled modal in `frontend/src/index.css` with Clash of Clans dark fantasy overlay, gold border, and red status badge
   - [x] Backend validator `_validate_submission_deadline` in `backend/app/routers/submissions.py` — rejects submissions after `timer_started_at + duration_minutes` or when `COMPLETED` with HTTP 400 "Submission deadline passed"
   - [x] Test suite: Backend pytest `backend/tests/test_contest_expiry.py` (3/3 passed) & Frontend Vitest `frontend/src/ProblemPage.test.tsx` (2/2 passed)
-- [ ] **Per-Question Time Calculation** *(Phase 4)*:
-  - [ ] Calculate elapsed seconds from batch start to successful solve for each problem
-  - [ ] Store `solve_time_seconds` in `Submission` table for tie-breakers and analytics
+- [x] **Per-Question Time Calculation** *(Phase 4 — COMPLETE)*:
+  - [x] Backend logic in `backend/app/routers/submissions.py`: computes `solve_time_seconds = (sub.created_at - batch.timer_started_at)` upon 'AC' verdict
+  - [x] Persisted `solve_time_seconds` integer in `Submission` table and exposed in `SubmissionResponse` schema
+  - [x] Updated `backend/app/routers/leaderboard.py`: aggregates total solve time per user based exclusively on their first successful AC per problem for tie-breaking
+  - [x] Verified via automated test suite `backend/test_solve_time.py` (3/3 passed: AC persistence, non-AC exclusion, multiple-solve first-AC tie-breaking)
 
 ### Vatsal's Tracker (`branch: vatsal`)
 - [ ] **Live Submission Counter**:
