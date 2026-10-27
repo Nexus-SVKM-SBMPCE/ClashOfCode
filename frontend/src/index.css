@@ -251,6 +251,95 @@ code, pre, .font-mono {
   margin-left: auto;
 }
 
+/* ─── Batch Timer ────────────────────────────────────────────────────────────── */
+.batch-timer {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  white-space: nowrap;
+  user-select: none;
+  transition: border-color 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+
+.batch-timer--loading {
+  opacity: 0.5;
+}
+
+.batch-timer--waiting {
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+}
+
+/* Active state: green glow */
+.batch-timer--active {
+  border-color: rgba(44, 187, 93, 0.4);
+  color: var(--ac);
+  box-shadow: 0 0 12px rgba(44, 187, 93, 0.12);
+}
+
+/* Urgent state (≤5 min): amber pulse */
+.batch-timer--urgent {
+  border-color: rgba(245, 158, 11, 0.6);
+  color: var(--brand);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
+  animation: urgentPulse 1.2s ease-in-out infinite;
+}
+
+/* Ended state: muted red */
+.batch-timer--ended {
+  border-color: rgba(239, 71, 67, 0.4);
+  color: var(--wa);
+  opacity: 0.85;
+}
+
+.timer-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.timer-display {
+  font-variant-numeric: tabular-nums;
+  min-width: 70px;
+  display: inline-block;
+  text-align: center;
+}
+
+.timer-waiting {
+  letter-spacing: 0.5px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: auto;
+}
+
+.timer-ended {
+  color: var(--wa);
+}
+
+/* Pulsing glow animation for the digits when ≤5 min */
+@keyframes urgentPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.15); }
+  50%       { box-shadow: 0 0 22px rgba(245, 158, 11, 0.45); }
+}
+
+.timer-pulsing {
+  animation: timerDigitFlash 1.2s ease-in-out infinite;
+}
+
+@keyframes timerDigitFlash {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.72; }
+}
+
+
 /* Demo Mode Toggle Switch */
 .demo-toggle {
   display: flex;

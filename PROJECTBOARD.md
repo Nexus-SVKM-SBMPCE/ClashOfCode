@@ -137,18 +137,24 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [ ] Leaderboard Arena: Clan War rankings with golden shield podiums and trophy icons
 
 ### Sanchita's Tracker (`branch: sanchita`)
-- [ ] **Per-Batch 1-Hour Countdown Timer**:
-  - [ ] Store batch start time & 60-minute duration in `Batch` database table
-  - [ ] Implement live synced countdown timer (`HH:MM:SS`) in the client navbar
-- [ ] **Admin Timer Control & Problem Locking**:
-  - [ ] Add `POST /api/admin/batches/{batch_id}/start-timer` endpoint
+- [x] **Per-Batch 1-Hour Countdown Timer** *(IN PROGRESS — Phase 1 complete)*:
+  - [x] Added `Batch` model with `timer_started_at` (UTC), `duration_minutes` (default 60), `status` (NOT_STARTED/ACTIVE/COMPLETED) — `backend/app/models.py`
+  - [x] Added `solve_time_seconds` + `batch_id` to `Submission` model for per-question time tracking
+  - [x] Created `backend/app/routers/batches.py` — `GET /api/batches/my-batch/timer` (server-synced clock), `POST /api/admin/batches/{batch_id}/start-timer`, batch CRUD
+  - [x] Added `GET /api/server-time` endpoint in `main.py` for initial clock skew calibration
+  - [x] Seeded default Batch 1 (NOT_STARTED) in `seeder.py`
+  - [x] Created `frontend/src/useCountdownTimer.ts` — server-synced hook (skew-corrected, re-polls every 30s, ticks every 1s)
+  - [x] Integrated `BatchTimer` component into `frontend/src/Navbar.tsx` (4 visual states: loading / waiting / active+pulse / ended)
+  - [x] Added timer CSS with urgency pulse animation (≤5 min amber glow) in `index.css`
+  - [x] TypeScript: `tsc --noEmit --skipLibCheck` exits 0; Python: all syntax OK
+- [ ] **Admin Timer Control & Problem Locking** *(Phase 2)*:
   - [ ] Restrict problem visibility: contestants cannot see problems until timer for their batch is started
   - [ ] Display "Waiting for Battle to Begin" screen before timer starts
-- [ ] **Contest Expiry & Submission Freeze**:
+- [ ] **Contest Expiry & Submission Freeze** *(Phase 2)*:
   - [ ] Display unclosable "Battle Finished / Event Ended" popup modal when timer hits 00:00:00
   - [ ] Disable Monaco editor and lock Run/Submit buttons upon expiration
   - [ ] Backend validator rejecting submissions received after batch deadline (HTTP 400)
-- [ ] **Per-Question Time Calculation**:
+- [ ] **Per-Question Time Calculation** *(Phase 2)*:
   - [ ] Calculate elapsed seconds from batch start to successful solve for each problem
   - [ ] Store `solve_time_seconds` in `Submission` table for tie-breakers and analytics
 

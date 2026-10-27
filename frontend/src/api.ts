@@ -191,3 +191,33 @@ export const getLeaderboard = () => {
   if (demoMode.enabled) return mockResp(MOCK_LEADERBOARD as LeaderboardEntry[]);
   return api.get<LeaderboardEntry[]>('/api/leaderboard');
 };
+
+// ─── Batch Timer ──────────────────────────────────────────────────────────────
+export interface BatchTimerInfo {
+  batch_id: number;
+  batch_name: string;
+  /** NOT_STARTED | ACTIVE | COMPLETED */
+  status: 'NOT_STARTED' | 'ACTIVE' | 'COMPLETED';
+  /** ISO-8601 UTC string, null if not started */
+  timer_started_at: string | null;
+  duration_minutes: number;
+  /** Server's current UTC time — MUST be used for countdown math, not Date.now() */
+  server_now_utc: string;
+  /** Pre-computed remaining seconds, null if not started */
+  remaining_seconds: number | null;
+}
+
+const MOCK_BATCH_TIMER: BatchTimerInfo = {
+  batch_id: 1,
+  batch_name: 'Batch 1 (Demo)',
+  status: 'ACTIVE',
+  timer_started_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // started 5 min ago
+  duration_minutes: 60,
+  server_now_utc: new Date().toISOString(),
+  remaining_seconds: 55 * 60, // 55 minutes left
+};
+
+export const getBatchTimer = () => {
+  if (demoMode.enabled) return mockResp(MOCK_BATCH_TIMER);
+  return api.get<BatchTimerInfo>('/api/batches/my-batch/timer');
+};
