@@ -147,9 +147,15 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Integrated `BatchTimer` component into `frontend/src/Navbar.tsx` (4 visual states: loading / waiting / active+pulse / ended)
   - [x] Added timer CSS with urgency pulse animation (≤5 min amber glow) in `index.css`
   - [x] TypeScript: `tsc --noEmit --skipLibCheck` exits 0; Python: all syntax OK
-- [ ] **Admin Timer Control & Problem Locking** *(Phase 2)*:
-  - [ ] Restrict problem visibility: contestants cannot see problems until timer for their batch is started
-  - [ ] Display "Waiting for Battle to Begin" screen before timer starts
+- [x] **Admin Timer Control & Problem Locking** *(Phase 2 — COMPLETE)*:
+  - [x] `POST /api/admin/batches/{batch_id}/start-timer` already built in Phase 1 (`batches.py`) — sets `timer_started_at = UTC now`, status → ACTIVE
+  - [x] Backend lock in `problems.py`: `_assert_batch_active()` — contestants get **HTTP 423 Locked** when no ACTIVE batch exists; admins bypass always
+  - [x] `frontend/src/BatchGate.tsx` — route-level guard wrapping `/problems` and `/problems/:slug`; fail-closed (error state → locked)
+  - [x] `frontend/src/pages/WaitingScreen.tsx` — animated "Arena is Locked" screen with floating castle icon, pulse rings, batch badge, live status dot
+  - [x] `frontend/src/App.tsx` — `BatchGate` injected around both problem routes inside `RequireAuth`
+  - [x] `isBatchLocked(err)` helper in `api.ts` for clean 423 detection
+  - [x] CSS for WaitingScreen + BatchGate spinner added to `index.css`
+  - [x] TypeScript: `tsc --noEmit --skipLibCheck` exits 0; Python: all syntax OK
 - [ ] **Contest Expiry & Submission Freeze** *(Phase 2)*:
   - [ ] Display unclosable "Battle Finished / Event Ended" popup modal when timer hits 00:00:00
   - [ ] Disable Monaco editor and lock Run/Submit buttons upon expiration

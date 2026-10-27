@@ -221,3 +221,4 @@ export const getBatchTimer = () => {
   if (demoMode.enabled) return mockResp(MOCK_BATCH_TIMER);
   return api.get<BatchTimerInfo>('/api/batches/my-batch/timer');
 };
+

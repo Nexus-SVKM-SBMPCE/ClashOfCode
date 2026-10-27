@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import { ToastProvider } from './Toast';
 import Navbar from './Navbar';
+import BatchGate from './BatchGate';
 import LoginPage from './pages/LoginPage';
 import ProblemsPage from './pages/ProblemsPage';
 import ProblemPage from './pages/ProblemPage';
@@ -28,8 +29,31 @@ function AppLayout() {
       <main className="main-content">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/problems" element={<RequireAuth><ProblemsPage /></RequireAuth>} />
-          <Route path="/problems/:slug" element={<RequireAuth><ProblemPage /></RequireAuth>} />
+          {/*
+            BatchGate wraps problem routes: shows WaitingScreen for
+            contestants when batch is NOT_STARTED, passes through
+            when ACTIVE/COMPLETED or user is admin.
+          */}
+          <Route
+            path="/problems"
+            element={
+              <RequireAuth>
+                <BatchGate>
+                  <ProblemsPage />
+                </BatchGate>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/problems/:slug"
+            element={
+              <RequireAuth>
+                <BatchGate>
+                  <ProblemPage />
+                </BatchGate>
+              </RequireAuth>
+            }
+          />
           <Route path="/leaderboard" element={<RequireAuth><LeaderboardPage /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/problems" replace />} />
         </Routes>
