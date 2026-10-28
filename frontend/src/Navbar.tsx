@@ -4,7 +4,6 @@ import { useAuth } from './AuthContext';
 import { demoMode } from './api';
 import LiveSubmissionCounter from './LiveSubmissionCounter';
 import Icon from './components/Icon';
-import { balloonFor } from './lib/arena';
 
 export default function Navbar() {
   const { user, signOut } = useAuth();
@@ -21,19 +20,17 @@ export default function Navbar() {
   return (
     <header className="app-header">
       <NavLink to="/problems" className="wordmark">
-        <span className="wordmark-mark" aria-hidden="true">
-          {[0, 1, 2, 3, 4, 5].map((i) => <span key={i} style={{ background: balloonFor(i % 5) }} />)}
-        </span>
-        <span className="wordmark-name">Code Clash</span>
-        <span className="wordmark-sub">Local Arena</span>
+        <span className="wordmark-mark" aria-hidden="true">⚔️</span>
+        <span className="wordmark-name">Clash of Code</span>
+        <span className="wordmark-sub">Battle Arena</span>
       </NavLink>
 
       <nav className="header-nav" aria-label="Main">
         <NavLink to="/problems" className={({ isActive }) => (isActive ? 'active' : '')}>
-          <Icon name="list" size={15} /> Problems
+          <Icon name="list" size={15} /> Quests
         </NavLink>
         <NavLink to="/leaderboard" className={({ isActive }) => (isActive ? 'active' : '')}>
-          <Icon name="trophy" size={15} /> Leaderboard
+          <Icon name="trophy" size={15} /> War Ranks
         </NavLink>
       </nav>
 
@@ -52,7 +49,7 @@ export default function Navbar() {
           <div className="identity">
             <span className="identity-avatar" aria-hidden="true">{user.display_name[0].toUpperCase()}</span>
             <span className="identity-name">{user.display_name}</span>
-            {user.role === 'admin' && <span className="role-tag">admin</span>}
+            {user.role === 'admin' && <span className="role-tag">Chief</span>}
             <button id="logout-btn" className="btn btn-ghost btn-icon" onClick={handleLogout} aria-label="Sign out" title="Sign out">
               <Icon name="logout" />
             </button>

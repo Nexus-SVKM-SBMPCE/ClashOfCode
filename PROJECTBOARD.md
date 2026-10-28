@@ -126,15 +126,20 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [ ] Add batch filtering to leaderboard: `GET /api/leaderboard?batch_id=X`
 
 ### Bhakti's Tracker (`branch: bhakti`)
-- [ ] **Clash of Clans Theme Design Tokens**:
-  - [ ] Define CoC color tokens: Gold (`#f59e0b`), Elixir (`#d946ef`), Dark Elixir (`#1e1b4b`), Stone/Wood backgrounds
-  - [ ] Style 3D tactile buttons with raised beveled borders and battle hover glows
-  - [ ] Implement clan badges, battle shields, and fantasy gaming typography
-- [ ] **Thematic Page Reskin**:
-  - [ ] Login Page: Clan War entrance portal with wooden banner and Town Hall status
-  - [ ] Problems Dashboard: "Battle Quests / Arena Challenges" with star/trophy indicators
-  - [ ] Code Editor Workspace: Fantasy command center with stone borders and gem-styled Run/Submit buttons
-  - [ ] Leaderboard Arena: Clan War rankings with golden shield podiums and trophy icons
+- [x] **Clash of Clans Theme Design Tokens**:
+  - [x] Define CoC color tokens: Gold (`#f5a623`/`#ffd700`), Elixir (`#d946ef`), Dark Elixir (`#0a0e1a`/`#141b2d`), Stone/Wood backgrounds — full palette in `index.css` `:root`
+  - [x] Style 3D tactile buttons with raised beveled gold gradients, stone borders, and battle hover glows (`.btn`, `.btn-primary` with multi-layer box-shadows)
+  - [x] Implement clan badge shields (`.balloon` → shield-shaped with `border-radius: 4px 4px 50% 50%`), war trophy ranking marks, fantasy typography (Cinzel + MedievalSharp Google Fonts)
+- [x] **Thematic Page Reskin**:
+  - [x] Login Page: Clan War entrance portal with battlefield background (`coc-bg.jpg`), golden shimmer form border, CoC logo (`coc-logo.jpg`), "Enter the Arena" CTA, floating ember effects
+  - [x] Problems Dashboard: "⚔️ Battle Quests" with war-themed labels ("Conquered", "Quests"), gold gradient page titles, quest-board styled table with golden hover highlights
+  - [x] Code Editor Workspace: Fantasy "Forge" command center with dark fortress Monaco theme (gold keywords, elixir types), "⚔️ Attack" submit button, "Briefing/My Attacks" tabs, CoC-styled verdict strip
+  - [x] Leaderboard Arena: "🏆 War Rankings" with golden shield podiums (🥇🥈🥉), clan terminology, glowing gold score text, gold-highlighted "YOU" row
+- [x] **Animations & Effects**:
+  - [x] Torch flicker on header edges, gold shimmer on login form, floating ember radial gradients
+  - [x] Shield solve animation (3D flip), sword slash logo entrance, glow pulse, banner wave
+  - [x] All transitions respect `prefers-reduced-motion: reduce`
+- Verification: `tsc --noEmit` exit 0, `vite build` exit 0, all pages themed consistently
 
 ### Sanchita's Tracker (`branch: sanchita`)
 - [ ] **Per-Batch 1-Hour Countdown Timer**:

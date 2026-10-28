@@ -16,7 +16,7 @@ export default function LeaderboardPage() {
     setRefreshing(true);
     getLeaderboard()
       .then((r) => { setBoard(r.data); setLastUpdate(new Date()); setError(null); })
-      .catch((e) => setError(e.response?.status === 403 ? 'You do not have access to the leaderboard.' : 'Could not refresh the leaderboard. Showing the last known standings.'))
+      .catch((e) => setError(e.response?.status === 403 ? 'You do not have clearance to view the war rankings.' : 'Could not refresh the war rankings. Showing last known standings.'))
       .finally(() => { setLoading(false); setRefreshing(false); });
   }, []);
 
@@ -27,22 +27,42 @@ export default function LeaderboardPage() {
   }, [refresh]);
 
   return (
-    <div className="page">
-      <div className="page-inner">
+    <div className="page page-leaderboard">
+      {/* Background image */}
+      <div className="lb-bg" aria-hidden="true">
+        <div className="lb-bg-overlay" />
+      </div>
+
+      {/* Floating ember particles */}
+      <div className="lb-embers" aria-hidden="true">
+        {Array.from({ length: 15 }, (_, i) => (
+          <div
+            key={`lb-ember-${i}`}
+            className="lb-ember"
+            style={{
+              left: `${3 + (i * 6.7) % 92}%`,
+              animationDelay: `${(i * 0.5) % 4}s`,
+              animationDuration: `${4 + (i % 3)}s`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="page-inner" style={{ position: 'relative', zIndex: 2 }}>
         <div className="page-head">
           <div>
-            <h1 className="page-title">Leaderboard</h1>
-            <p className="page-sub">Ranked by score, then problems solved, then time of the last scoring submission.</p>
+            <h1 className="page-title">🏆 War Rankings</h1>
+            <p className="page-sub">Ranked by battle score, then quests conquered, then time of last victorious submission.</p>
           </div>
           <div className="board-meta">
             <span>Updated <span className="mono">{lastUpdate.toLocaleTimeString()}</span> · every 15s</span>
-            <button className="btn" onClick={refresh} disabled={refreshing}>
-              {refreshing ? <span className="spinner" /> : <Icon name="refresh" size={14} />} Refresh
+            <button className="btn btn-ghost btn-sm" onClick={refresh} disabled={refreshing}>
+              <Icon name="refresh" className={refreshing ? 'spin' : ''} /> Refresh
             </button>
           </div>
         </div>
 
-        {demoMode.enabled && <div className="demo-note"><span className="demo-tag">Demo</span> Sample standings, not real contest results.</div>}
+        {demoMode.enabled && <div className="demo-note"><span className="demo-tag">Demo</span> Sample war standings, not real battle results.</div>}
         {error && <div className="inline-error" role="alert"><Icon name="alert" size={14} /> {error}</div>}
 
         <div className="panel panel-scroll">
@@ -50,42 +70,51 @@ export default function LeaderboardPage() {
             <thead>
               <tr>
                 <th className="col-rank">Rank</th>
-                <th>Team</th>
+                <th>Clan</th>
                 <th className="align-right">Score</th>
-                <th className="align-right">Solved</th>
-                <th className="align-right col-secondary">Submissions</th>
-                <th className="align-right col-secondary">Last AC</th>
+                <th className="align-right">Conquered</th>
+                <th className="align-right col-secondary">Attacks</th>
+                <th className="align-right col-secondary">Last Victory</th>
               </tr>
             </thead>
             <tbody>
-              {loading && Array.from({ length: 5 }, (_, i) => (
+              {loading && Array.from({ length: 6 }, (_, i) => (
                 <tr key={`sk-${i}`} aria-hidden="true">
                   <td><span className="skeleton" style={{ width: 24 }} /></td>
-                  <td><span className="skeleton" style={{ width: 160 }} /></td>
-                  <td colSpan={4}><span className="skeleton" style={{ width: '100%' }} /></td>
+                  <td><span className="skeleton" style={{ width: 140 }} /></td>
+                  <td className="align-right"><span className="skeleton" style={{ width: 40 }} /></td>
+                  <td className="align-right"><span className="skeleton" style={{ width: 30 }} /></td>
+                  <td className="align-right col-secondary"><span className="skeleton" style={{ width: 30 }} /></td>
+                  <td className="align-right col-secondary"><span className="skeleton" style={{ width: 60 }} /></td>
                 </tr>
               ))}
               {board.map((e) => {
-                const podium = e.total_score > 0 && e.rank <= 3 ? `rank-${e.rank}` : '';
+                const podium = e.rank === 1 ? 'rank-1' : e.rank === 2 ? 'rank-2' : e.rank === 3 ? 'rank-3' : '';
                 const isYou = user?.id === e.user_id;
                 return (
                   <tr key={e.user_id} className={`${podium} ${isYou ? 'is-you' : ''}`}>
-                    <td><span className="rank"><span className="rank-mark" aria-hidden="true" />{e.rank}</span></td>
+                    <td>
+                      <span className="rank">
+                        <span className="rank-mark" aria-hidden="true" />
+                        {e.rank <= 3 && e.total_score > 0 ? (
+                          <span>{e.rank === 1 ? '🥇' : e.rank === 2 ? '🥈' : '🥉'} {e.rank}</span>
+                        ) : e.rank}
+                      </span>
+                    </td>
                     <td>
                       <div className="team">
                         <span className="team-name">{e.display_name}{isYou && <span className="you-tag">YOU</span>}</span>
-                        <span className="team-handle">@{e.username}</span>
                       </div>
                     </td>
-                    <td className="align-right"><span className="score">{e.total_score}</span></td>
+                    <td className="align-right"><span className="score mono">{e.total_score}</span></td>
                     <td className="align-right mono">{e.solved_count}</td>
-                    <td className="align-right mono col-secondary">{e.total_submissions}</td>
-                    <td className="align-right mono col-secondary">{e.last_ac_time ? new Date(e.last_ac_time).toLocaleTimeString() : '—'}</td>
+                    <td className="align-right col-secondary mono">{e.total_submissions}</td>
+                    <td className="align-right col-secondary meta">{e.last_ac_time ? new Date(e.last_ac_time).toLocaleTimeString() : '—'}</td>
                   </tr>
                 );
               })}
               {!loading && board.length === 0 && (
-                <tr><td colSpan={6}><div className="state"><p className="state-title">No teams on the board yet</p><p>Standings appear as soon as teams start submitting.</p></div></td></tr>
+                <tr><td colSpan={6}><div className="state"><p className="state-title">No clans on the battlefield yet</p><p>War rankings appear as soon as clans begin their attacks.</p></div></td></tr>
               )}
             </tbody>
           </table>

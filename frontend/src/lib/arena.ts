@@ -7,8 +7,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { getProblems, getMySubmissions } from '../api';
 import type { Problem, Submission } from '../api';
 
-// One colour per problem, kept clear of the verdict greens/reds and the lime accent.
-const BALLOONS = ['#5AB0FF', '#B18CFF', '#FF8A4C', '#FF7AC6', '#C9D1DC', '#4FD1C5', '#F2D15C', '#8FA3FF'];
+// CoC-themed colours: gold, elixir, war red, gem blue, emerald, dark elixir, fire orange, royal purple.
+const BALLOONS = ['#ffd700', '#d946ef', '#ff4d5a', '#5AB0FF', '#4ade80', '#a855f7', '#ff6b35', '#c084fc'];
 
 export const letterFor = (index: number) =>
   index < 26 ? String.fromCharCode(65 + index) : `P${index + 1}`;
