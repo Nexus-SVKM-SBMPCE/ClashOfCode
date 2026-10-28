@@ -24,7 +24,7 @@ export default function LoginPage() {
     try {
       await signIn(username, password);
     } catch {
-      setError('Invalid username or password');
+      setError('Invalid clan credentials');
     } finally {
       setLoading(false);
     }
@@ -37,16 +37,19 @@ export default function LoginPage() {
     <div className="login">
       <div className="login-card">
         <div className="login-brand">
+          {/* CoC Logo */}
+          <img src="/coc-logo.jpg" alt="Clash of Code" className="login-logo" />
+
           <div className="login-balloons" aria-hidden="true">
             {[0, 1, 2, 3, 4].map((i) => <Balloon key={i} letter={letterFor(i)} color={balloonFor(i)} />)}
           </div>
-          <h1 className="login-title">Code Clash <span>— Local Arena</span></h1>
-          <p className="login-lede">Sign in with your team credentials to enter the contest.</p>
+          <h1 className="login-title">Clash of Code <span>⚔️ Battle Arena</span></h1>
+          <p className="login-lede">Enter your clan credentials to join the war.</p>
         </div>
 
         <form onSubmit={submit} className="login-form">
           <div className="field">
-            <label htmlFor="username-input">Team username</label>
+            <label htmlFor="username-input">Clan Username</label>
             <input
               id="username-input"
               className="input"
@@ -58,11 +61,12 @@ export default function LoginPage() {
               spellCheck={false}
               required
               autoFocus
+              placeholder="Enter your clan name..."
               aria-invalid={error ? true : undefined}
             />
           </div>
           <div className="field">
-            <label htmlFor="password-input">Password</label>
+            <label htmlFor="password-input">War Password</label>
             <input
               id="password-input"
               className="input"
@@ -71,22 +75,23 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               required
+              placeholder="Enter your secret..."
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? 'login-error' : undefined}
             />
           </div>
           {error && (
             <p id="login-error" className="form-error" role="alert">
-              <Icon name="alert" size={14} /> {error}. Ask the organizers if you’re unsure.
+              <Icon name="alert" size={14} /> {error}. Ask the war generals if you're unsure.
             </p>
           )}
           <button id="login-btn" type="submit" className="btn btn-primary btn-lg" disabled={loading}>
-            {loading ? <><span className="spinner" /> Signing in…</> : 'Sign in'}
+            {loading ? <><span className="spinner" /> Entering Battle…</> : '⚔️ Enter the Arena'}
           </button>
         </form>
 
         <div className="login-hint">
-          <span>Demo accounts:</span>
+          <span>Demo clans:</span>
           {DEMO_ACCOUNTS.map((a) => (
             <button key={a.username} type="button" onClick={() => { setUsername(a.username); setPassword(a.password); setError(''); }}>
               {a.username} / {a.password}

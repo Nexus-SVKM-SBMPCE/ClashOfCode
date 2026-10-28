@@ -64,8 +64,8 @@ public class Main {
 };
 
 const VERDICT_LABEL: Record<string, string> = {
-  AC: 'Accepted', WA: 'Wrong Answer', TLE: 'Time Limit Exceeded', MLE: 'Memory Limit Exceeded',
-  CE: 'Compilation Error', RE: 'Runtime Error', IE: 'Judge Error',
+  AC: 'Victory!', WA: 'Defeated', TLE: 'Time Exceeded', MLE: 'Memory Exceeded',
+  CE: 'Spell Error', RE: 'Catastrophic Failure', IE: 'War Council Error',
 };
 const VERDICT_TONE: Record<string, string> = {
   AC: 'tone-ac', WA: 'tone-wa', TLE: 'tone-pending', MLE: 'tone-pending', CE: 'tone-ce', RE: 'tone-wa', IE: 'tone-muted',
@@ -83,23 +83,31 @@ function fmtMemory(kb: number | null) {
   return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
 }
 
-// Editor colours follow the app tokens (Monaco cannot read CSS variables).
+// Editor colours — CoC dark fortress theme
 const defineTheme: BeforeMount = (monaco) => {
   monaco.editor.defineTheme('clash', {
     base: 'vs-dark',
     inherit: true,
-    rules: [{ token: 'comment', foreground: '8A929E', fontStyle: 'italic' }],
+    rules: [
+      { token: 'comment', foreground: '6b6b55', fontStyle: 'italic' },
+      { token: 'keyword', foreground: 'f5a623' },
+      { token: 'string', foreground: '4ade80' },
+      { token: 'number', foreground: 'ffd700' },
+      { token: 'type', foreground: 'd946ef' },
+    ],
     colors: {
-      'editor.background': '#0B0D10',
-      'editor.lineHighlightBackground': '#14171C',
-      'editorLineNumber.foreground': '#7A828E',
-      'editorLineNumber.activeForeground': '#A1A8B3',
-      'editorCursor.foreground': '#D8FF3E',
-      'editor.selectionBackground': '#D8FF3E33',
-      'editorIndentGuide.background1': '#1E232A',
-      'editorWidget.background': '#1A1E24',
-      'editorWidget.border': '#3A414B',
-      'scrollbarSlider.background': '#3A414B80',
+      'editor.background': '#0a0e1a',
+      'editor.lineHighlightBackground': '#141b2d',
+      'editorLineNumber.foreground': '#5c4a2e',
+      'editorLineNumber.activeForeground': '#f5a623',
+      'editorCursor.foreground': '#ffd700',
+      'editor.selectionBackground': '#f5a62333',
+      'editorIndentGuide.background1': '#1a2340',
+      'editorWidget.background': '#141b2d',
+      'editorWidget.border': '#3d4f7a',
+      'scrollbarSlider.background': '#3d4f7a80',
+      'editor.findMatchBackground': '#f5a62340',
+      'editor.findMatchHighlightBackground': '#f5a62320',
     },
   });
 };
@@ -116,7 +124,7 @@ function TestsBar({ passed, total }: { passed: number; total: number }) {
 
 /** Score line, straight from the API: "6/10 tests passed · 60 +3 bonus = 63 pts". */
 function ScoreLine({ sub, simulated }: { sub: Submission; simulated: boolean }) {
-  if (sub.verdict === 'IE') return <span className="strip-score">Not your code — the judge was unavailable. Please resubmit.</span>;
+  if (sub.verdict === 'IE') return <span className="strip-score">Not your code — the war council was unavailable. Please resubmit.</span>;
   const tests = sub.tests_total > 0 && sub.verdict !== 'CE'
     ? <><span className="mono">{sub.tests_passed}/{sub.tests_total}</span> tests passed · </>
     : null;
@@ -201,7 +209,7 @@ export default function ProblemPage() {
     setDrafts(STARTERS);
     getProblem(slug)
       .then((r) => setProblem(r.data))
-      .catch((e) => setLoadError(e.response?.status === 404 ? 'Problem not found.' : 'Could not load this problem. Is the backend running?'));
+      .catch((e) => setLoadError(e.response?.status === 404 ? 'Quest not found in the war archives.' : 'Could not load this quest. Is the fortress backend running?'));
     getMySubmissions(slug)
       .then((r) => setSubmissions(r.data))
       .catch(() => setSubmissions([]));
@@ -221,12 +229,12 @@ export default function ProblemPage() {
       setDetailOpen(true);
       setSubmissions((prev) => [res.data, ...prev]);
       window.dispatchEvent(new Event('submission:created'));
-      if (res.data.verdict === 'IE') addToast('The judge is unavailable right now. Please resubmit in a moment.', 'error');
-      else if (res.data.verdict === 'AC') addToast(`Accepted! +${res.data.score} pts`, 'success');
-      else if (res.data.score > 0) addToast(`Partial credit: +${res.data.score} pts`, 'info');
+      if (res.data.verdict === 'IE') addToast('The war council is unavailable. Please resubmit.', 'error');
+      else if (res.data.verdict === 'AC') addToast(`⚔️ Victory! +${res.data.score} pts`, 'success');
+      else if (res.data.score > 0) addToast(`Partial conquest: +${res.data.score} pts`, 'info');
     } catch (e: any) {
       const detail = e.response?.data?.detail;
-      addToast('Submission failed: ' + (typeof detail === 'string' ? detail : e.message), 'error');
+      addToast('Attack failed: ' + (typeof detail === 'string' ? detail : e.message), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -255,10 +263,10 @@ export default function ProblemPage() {
     <div className="state state-error">
       <Icon name="alert" size={22} className="state-icon" />
       <p className="state-title">{loadError}</p>
-      <Link to="/problems" className="btn"><Icon name="chevronLeft" size={14} /> Back to problems</Link>
+      <Link to="/problems" className="btn"><Icon name="chevronLeft" size={14} /> Back to quests</Link>
     </div>
   );
-  if (!problem) return <div className="state"><span className="spinner" /> Loading problem…</div>;
+  if (!problem) return <div className="state"><span className="spinner" /> Summoning quest…</div>;
 
   const current = problems.find((p) => p.slug === problem.slug);
   const ext = LANGUAGES.find((l) => l.id === lang)?.ext ?? 'txt';
@@ -268,8 +276,8 @@ export default function ProblemPage() {
   return (
     <div className="workspace" data-pane={pane}>
       {/* Problem rail: jump between problems; balloons fill once solved */}
-      <nav className="problem-rail" aria-label="Problems">
-        <Link to="/problems" className="btn btn-ghost btn-icon rail-back" aria-label="All problems" title="All problems">
+      <nav className="problem-rail" aria-label="Quests">
+        <Link to="/problems" className="btn btn-ghost btn-icon rail-back" aria-label="All quests" title="All quests">
           <Icon name="chevronLeft" />
         </Link>
         <div className="rail-scroll">
@@ -287,14 +295,14 @@ export default function ProblemPage() {
         ))}
         </div>
         <div className="pane-switch" role="group" aria-label="View">
-          <button aria-pressed={pane === 'problem'} onClick={() => setPane('problem')}><Icon name="file" size={14} /> Problem</button>
-          <button aria-pressed={pane === 'code'} onClick={() => setPane('code')}><Icon name="code" size={14} /> Code</button>
+          <button aria-pressed={pane === 'problem'} onClick={() => setPane('problem')}><Icon name="file" size={14} /> Quest</button>
+          <button aria-pressed={pane === 'code'} onClick={() => setPane('code')}><Icon name="code" size={14} /> Forge</button>
         </div>
       </nav>
 
       <div className="split" ref={splitRef} style={{ ['--split' as string]: `${split}%` }}>
         {/* Statement pane */}
-        <section className="pane pane-statement" aria-label="Problem statement">
+        <section className="pane pane-statement" aria-label="Quest briefing">
           <div className="pane-head">
             <h1 className="pane-title">
               {current && <Balloon letter={current.letter} color={current.balloon} solved={status[problem.slug]?.solved} />}
@@ -308,9 +316,9 @@ export default function ProblemPage() {
           </div>
 
           <div className="tabs" role="tablist">
-            <button role="tab" className="tab" aria-selected={activeTab === 'problem'} onClick={() => setActiveTab('problem')}>Statement</button>
+            <button role="tab" className="tab" aria-selected={activeTab === 'problem'} onClick={() => setActiveTab('problem')}>Briefing</button>
             <button role="tab" className="tab" aria-selected={activeTab === 'submissions'} onClick={() => setActiveTab('submissions')}>
-              My submissions {submissions.length > 0 && <span className="tab-count">{submissions.length}</span>}
+              My Attacks {submissions.length > 0 && <span className="tab-count">{submissions.length}</span>}
             </button>
           </div>
 
@@ -322,7 +330,7 @@ export default function ProblemPage() {
                 </article>
                 {problem.sample_test_cases.length > 0 && !/sample/i.test(problem.statement) && (
                   <div className="samples">
-                    <h2 className="samples-title">Sample tests</h2>
+                    <h2 className="samples-title">⚔️ Sample Battles</h2>
                     {problem.sample_test_cases.map((tc, i) => (
                       <div className="sample" key={i}>
                         <div>
@@ -340,12 +348,12 @@ export default function ProblemPage() {
               </>
             ) : submissions.length === 0 ? (
               <div className="state">
-                <p className="state-title">No submissions yet</p>
-                <p>Write your solution, then press Submit or <kbd>Ctrl</kbd> + <kbd>Enter</kbd>.</p>
+                <p className="state-title">No attacks launched yet</p>
+                <p>Forge your weapon, then press Attack or <kbd>Ctrl</kbd> + <kbd>Enter</kbd>.</p>
               </div>
             ) : (
               <table className="subs">
-                <thead><tr><th>#</th><th>Verdict</th><th>Tests</th><th>Points</th><th>Lang</th><th>Time</th><th>Memory</th></tr></thead>
+                <thead><tr><th>#</th><th>Result</th><th>Tests</th><th>Loot</th><th>Weapon</th><th>Time</th><th>Memory</th></tr></thead>
                 <tbody>
                   {submissions.map((s) => (
                     <tr key={s.id}>
@@ -368,7 +376,7 @@ export default function ProblemPage() {
           className={`resizer ${dragging ? 'dragging' : ''}`}
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize statement and editor"
+          aria-label="Resize briefing and forge"
           aria-valuemin={25}
           aria-valuemax={70}
           aria-valuenow={Math.round(split)}
@@ -380,16 +388,16 @@ export default function ProblemPage() {
           onKeyDown={onResizeKey}
         />
 
-        {/* Editor pane */}
-        <section className="pane pane-editor" aria-label="Code editor">
+        {/* Editor pane — The Forge */}
+        <section className="pane pane-editor" aria-label="Code forge">
           <div className="editor-toolbar">
             <span className="editor-file"><Icon name="file" size={14} />solution.{ext}</span>
-            <label htmlFor="language-select" className="sr-only">Language</label>
+            <label htmlFor="language-select" className="sr-only">Weapon</label>
             <select id="language-select" className="select" value={lang} onChange={(e) => setLang(e.target.value)} disabled={submitting}>
               {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
             </select>
-            <button id="submit-btn" className="btn btn-primary" onClick={submit} disabled={submitting} title="Submit (Ctrl+Enter)">
-              {submitting ? <><span className="spinner" /> Judging…</> : <><Icon name="play" size={13} /> Submit <kbd>Ctrl ↵</kbd></>}
+            <button id="submit-btn" className="btn btn-primary" onClick={submit} disabled={submitting} title="Attack (Ctrl+Enter)">
+              {submitting ? <><span className="spinner" /> Battling…</> : <>⚔️ Attack <kbd>Ctrl ↵</kbd></>}
             </button>
           </div>
 
@@ -426,8 +434,8 @@ export default function ProblemPage() {
           {submitting && (
             <div className="verdict-strip" role="status">
               <div className="strip-row">
-                <span className="strip-verdict tone-pending"><span className="spinner" /> Judging</span>
-                <span className="strip-score">Running your code against every test case…</span>
+                <span className="strip-verdict tone-pending"><span className="spinner" /> ⚔️ Battling</span>
+                <span className="strip-score">Your warriors are fighting through every test case…</span>
               </div>
             </div>
           )}
