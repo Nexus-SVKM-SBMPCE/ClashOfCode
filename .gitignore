@@ -7,6 +7,9 @@ __pycache__/
 *$py.class
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 tests
 code_context.txt
 surface_context.txt
@@ -35,3 +38,13 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Local AI agent skills / tool config (not part of Code Clash)
+/.agent/
+/.agents/
+/.claude/
+/.codex/
+/.gemini/
+/.impeccable/
+/.opencode/
+/PRODUCT.md

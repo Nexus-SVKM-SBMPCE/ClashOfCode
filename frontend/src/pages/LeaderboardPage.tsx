@@ -1,83 +1,125 @@
-import { useEffect, useState } from 'react';
-import { getLeaderboard } from '../api';
+import { useCallback, useEffect, useState } from 'react';
+import { getLeaderboard, demoMode } from '../api';
 import type { LeaderboardEntry } from '../api';
-
-const MEDAL: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
+import { useAuth } from '../AuthContext';
+import Icon from '../components/Icon';
 
 export default function LeaderboardPage() {
+  const { user } = useAuth();
   const [board, setBoard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(() => new Date());
+  const [error, setError] = useState<string | null>(null);
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
+    setRefreshing(true);
     getLeaderboard()
-      .then((r) => { setBoard(r.data); setLastUpdate(new Date()); })
-      .finally(() => setLoading(false));
-  };
+      .then((r) => { setBoard(r.data); setLastUpdate(new Date()); setError(null); })
+      .catch((e) => setError(e.response?.status === 403 ? 'You do not have clearance to view the war rankings.' : 'Could not refresh the war rankings. Showing last known standings.'))
+      .finally(() => { setLoading(false); setRefreshing(false); });
+  }, []);
 
   useEffect(() => {
     refresh();
     const interval = setInterval(refresh, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [refresh]);
 
   return (
-    <div className="page leaderboard-page">
-      <div className="page-header">
-        <h2>Leaderboard</h2>
-        <div className="lb-meta">
-          <span className="live-badge">⚡ LIVE</span>
-          <span className="update-time">Updated {lastUpdate.toLocaleTimeString()}</span>
-          <button className="btn-refresh" onClick={refresh}>↻ Refresh</button>
-        </div>
+    <div className="page page-leaderboard">
+      {/* Background image */}
+      <div className="lb-bg" aria-hidden="true">
+        <div className="lb-bg-overlay" />
       </div>
 
-      {loading ? (
-        <div className="page-loading">Loading…</div>
-      ) : (
-        <div className="leaderboard-table-wrap">
-          <table className="leaderboard-table">
+      {/* Floating ember particles */}
+      <div className="lb-embers" aria-hidden="true">
+        {Array.from({ length: 15 }, (_, i) => (
+          <div
+            key={`lb-ember-${i}`}
+            className="lb-ember"
+            style={{
+              left: `${3 + (i * 6.7) % 92}%`,
+              animationDelay: `${(i * 0.5) % 4}s`,
+              animationDuration: `${4 + (i % 3)}s`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="page-inner" style={{ position: 'relative', zIndex: 2 }}>
+        <div className="page-head">
+          <div>
+            <h1 className="page-title">🏆 War Rankings</h1>
+            <p className="page-sub">Ranked by battle score, then quests conquered, then time of last victorious submission.</p>
+          </div>
+          <div className="board-meta">
+            <span>Updated <span className="mono">{lastUpdate.toLocaleTimeString()}</span> · every 15s</span>
+            <button className="btn btn-ghost btn-sm" onClick={refresh} disabled={refreshing}>
+              <Icon name="refresh" className={refreshing ? 'spin' : ''} /> Refresh
+            </button>
+          </div>
+        </div>
+
+        {demoMode.enabled && <div className="demo-note"><span className="demo-tag">Demo</span> Sample war standings, not real battle results.</div>}
+        {error && <div className="inline-error" role="alert"><Icon name="alert" size={14} /> {error}</div>}
+
+        <div className="panel panel-scroll">
+          <table className="table board-table">
             <thead>
               <tr>
-                <th>Rank</th>
-                <th>Participant</th>
-                <th>Score</th>
-                <th>Solved</th>
-                <th>Submissions</th>
-                <th>Last AC</th>
+                <th className="col-rank">Rank</th>
+                <th>Clan</th>
+                <th className="align-right">Score</th>
+                <th className="align-right">Conquered</th>
+                <th className="align-right col-secondary">Attacks</th>
+                <th className="align-right col-secondary">Last Victory</th>
               </tr>
             </thead>
             <tbody>
-              {board.map((entry) => (
-                <tr key={entry.user_id} className={entry.rank <= 3 ? `top-${entry.rank}` : ''}>
-                  <td className="rank-cell">
-                    {MEDAL[entry.rank] || `#${entry.rank}`}
-                  </td>
-                  <td className="name-cell">
-                    <span className="display-name">{entry.display_name}</span>
-                    <span className="username">@{entry.username}</span>
-                  </td>
-                  <td className="score-cell">
-                    <span className="score-value">{entry.total_score}</span>
-                  </td>
-                  <td className="solved-cell">{entry.solved_count}</td>
-                  <td className="subs-cell">{entry.total_submissions}</td>
-                  <td className="time-cell">
-                    {entry.last_ac_time
-                      ? new Date(entry.last_ac_time).toLocaleTimeString()
-                      : '—'}
-                  </td>
+              {loading && Array.from({ length: 6 }, (_, i) => (
+                <tr key={`sk-${i}`} aria-hidden="true">
+                  <td><span className="skeleton" style={{ width: 24 }} /></td>
+                  <td><span className="skeleton" style={{ width: 140 }} /></td>
+                  <td className="align-right"><span className="skeleton" style={{ width: 40 }} /></td>
+                  <td className="align-right"><span className="skeleton" style={{ width: 30 }} /></td>
+                  <td className="align-right col-secondary"><span className="skeleton" style={{ width: 30 }} /></td>
+                  <td className="align-right col-secondary"><span className="skeleton" style={{ width: 60 }} /></td>
                 </tr>
               ))}
-              {board.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="empty-state">No submissions yet. Be the first!</td>
-                </tr>
+              {board.map((e) => {
+                const podium = e.rank === 1 ? 'rank-1' : e.rank === 2 ? 'rank-2' : e.rank === 3 ? 'rank-3' : '';
+                const isYou = user?.id === e.user_id;
+                return (
+                  <tr key={e.user_id} className={`${podium} ${isYou ? 'is-you' : ''}`}>
+                    <td>
+                      <span className="rank">
+                        <span className="rank-mark" aria-hidden="true" />
+                        {e.rank <= 3 && e.total_score > 0 ? (
+                          <span>{e.rank === 1 ? '🥇' : e.rank === 2 ? '🥈' : '🥉'} {e.rank}</span>
+                        ) : e.rank}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="team">
+                        <span className="team-name">{e.display_name}{isYou && <span className="you-tag">YOU</span>}</span>
+                      </div>
+                    </td>
+                    <td className="align-right"><span className="score mono">{e.total_score}</span></td>
+                    <td className="align-right mono">{e.solved_count}</td>
+                    <td className="align-right col-secondary mono">{e.total_submissions}</td>
+                    <td className="align-right col-secondary meta">{e.last_ac_time ? new Date(e.last_ac_time).toLocaleTimeString() : '—'}</td>
+                  </tr>
+                );
+              })}
+              {!loading && board.length === 0 && (
+                <tr><td colSpan={6}><div className="state"><p className="state-title">No clans on the battlefield yet</p><p>War rankings appear as soon as clans begin their attacks.</p></div></td></tr>
               )}
             </tbody>
           </table>
         </div>
-      )}
+      </div>
     </div>
   );
 }

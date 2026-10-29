@@ -3,6 +3,7 @@ Submissions router:
   POST /api/submissions          — evaluate all hidden tests, compute final verdict
   GET  /api/submissions/{id}     — get one submission (owner or admin)
   GET  /api/submissions          — list own submissions (admin sees all)
+  GET  /api/submissions/stats    — live arena counters (total, AC today, active teams)
 """
 import json
 from datetime import datetime, timedelta, timezone
@@ -10,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, field_validator
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 
 from app.auth import get_current_user
 from app.config import SUPPORTED_LANGUAGES
@@ -26,6 +27,7 @@ from app.models import (
     BATCH_STATUS_COMPLETED,
     BATCH_STATUS_NOT_STARTED,
 )
+from app.scoring import compute_score
 
 router = APIRouter(prefix="/api/submissions", tags=["submissions"])
 
@@ -62,6 +64,10 @@ class SubmissionResponse(BaseModel):
     status: str
     verdict: Optional[str]
     score: int
+    test_score: int = 0
+    bonus_points: int = 0
+    tests_passed: int = 0
+    tests_total: int = 0
     runtime_ms: Optional[float]
     memory_kb: Optional[int]
     compile_error: Optional[str]    # only for CE on own submission
@@ -78,6 +84,10 @@ def _to_response(sub: Submission, problem_slug: str, include_ce: bool = True) ->
         status=sub.status,
         verdict=sub.verdict,
         score=sub.score,
+        test_score=sub.test_score or 0,
+        bonus_points=sub.bonus_points or 0,
+        tests_passed=sub.tests_passed or 0,
+        tests_total=sub.tests_total or 0,
         runtime_ms=sub.runtime_ms,
         memory_kb=sub.memory_kb,
         compile_error=sub.compile_error if include_ce else None,
@@ -211,11 +221,19 @@ def create_submission(
             "verdict": verdict,
         })
 
+        # IE = judge unreachable/broken: remaining tests would fail the same way, so stop early
+        if verdict == "IE":
+            final_verdict = "IE"
+            break
+
         # First non-AC verdict wins (order: CE > TLE > MLE > RE > WA)
         if final_verdict == "AC" and verdict != "AC":
             final_verdict = verdict
 
-    score = 100 if final_verdict == "AC" else 0
+    # Granular marks: per-test-case points (>= 50% threshold) + difficulty bonus on full AC.
+    # A CE means nothing ran, so nothing passed.
+    tests_passed = 0 if final_verdict == "CE" else sum(1 for r in test_results if r["verdict"] == "AC")
+    marks = compute_score(tests_passed, len(test_cases), prob.difficulty)
 
     if final_verdict == "AC":
         if batch and batch.timer_started_at:
@@ -232,7 +250,11 @@ def create_submission(
     # Persist results
     sub.status       = "done"
     sub.verdict      = final_verdict
-    sub.score        = score
+    sub.score        = marks["score"]
+    sub.test_score   = marks["test_score"]
+    sub.bonus_points = marks["bonus_points"]
+    sub.tests_passed = tests_passed
+    sub.tests_total  = len(test_cases)
     sub.runtime_ms   = worst_runtime if worst_runtime > 0 else None
     sub.memory_kb    = worst_memory  if worst_memory  > 0 else None
     sub.compile_error = compile_error_text
@@ -266,6 +288,42 @@ def list_submissions(
         _to_response(sub, prob.slug, include_ce=(sub.user_id == current_user.id or current_user.role == "admin"))
         for sub, prob in rows
     ]
+
+
+class SubmissionStats(BaseModel):
+    total_submissions: int
+    accepted_today: int
+    active_teams: int
+    server_time: str
+
+
+@router.get("/stats", response_model=SubmissionStats)
+def submission_stats(
+    session: Session = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> SubmissionStats:
+    """Arena-wide counters for the navbar. Aggregates only — no per-team data leaks."""
+    now = datetime.now(timezone.utc)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    active_since = now - timedelta(minutes=15)
+
+    total = session.exec(select(func.count(Submission.id))).one()
+    accepted_today = session.exec(
+        select(func.count(Submission.id)).where(
+            Submission.verdict == "AC", Submission.created_at >= day_start
+        )
+    ).one()
+    active = session.exec(
+        select(func.count(func.distinct(Submission.user_id))).where(
+            Submission.created_at >= active_since
+        )
+    ).one()
+    return SubmissionStats(
+        total_submissions=total,
+        accepted_today=accepted_today,
+        active_teams=active,
+        server_time=now.isoformat(),
+    )
 
 
 @router.get("/{submission_id}", response_model=SubmissionResponse)
