@@ -45,6 +45,8 @@ _SUBMISSION_COLUMNS = {
     "bonus_points": "INTEGER NOT NULL DEFAULT 0",
     "tests_passed": "INTEGER NOT NULL DEFAULT 0",
     "tests_total": "INTEGER NOT NULL DEFAULT 0",
+    "solve_time_seconds": "INTEGER DEFAULT NULL",
+    "batch_id": "INTEGER DEFAULT NULL",
 }
 
 

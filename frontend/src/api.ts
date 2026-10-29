@@ -254,3 +254,6 @@ export const getBatchTimer = () => {
   return api.get<BatchTimerInfo>('/api/batches/my-batch/timer');
 };
 
+
+export const isBatchLocked = (err: any): boolean =>
+  err?.response?.status === 423 || err?.status === 423;

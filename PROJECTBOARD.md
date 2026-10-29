@@ -142,7 +142,7 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
 - Verification: `tsc --noEmit` exit 0, `vite build` exit 0, all pages themed consistently
 
 ### Sanchita's Tracker (`branch: sanchita`)
-- [x] **Per-Batch 1-Hour Countdown Timer** *(IN PROGRESS — Phase 1 complete)*:
+- [x] **Per-Batch 1-Hour Countdown Timer** *(Phase 1 — COMPLETE)*:
   - [x] Added `Batch` model with `timer_started_at` (UTC), `duration_minutes` (default 60), `status` (NOT_STARTED/ACTIVE/COMPLETED) — `backend/app/models.py`
   - [x] Added `solve_time_seconds` + `batch_id` to `Submission` model for per-question time tracking
   - [x] Created `backend/app/routers/batches.py` — `GET /api/batches/my-batch/timer` (server-synced clock), `POST /api/admin/batches/{batch_id}/start-timer`, batch CRUD
@@ -166,7 +166,7 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Updated `frontend/src/pages/ProblemPage.tsx` — Monaco editor set to `readOnly: true`, Submit button disabled with "⏱ Contest Ended"
   - [x] Styled modal in `frontend/src/index.css` with Clash of Clans dark fantasy overlay, gold border, and red status badge
   - [x] Backend validator `_validate_submission_deadline` in `backend/app/routers/submissions.py` — rejects submissions after `timer_started_at + duration_minutes` or when `COMPLETED` with HTTP 400 "Submission deadline passed"
-  - [x] Test suite: Backend pytest `backend/tests/test_contest_expiry.py` (3/3 passed) & Frontend Vitest `frontend/src/ProblemPage.test.tsx` (2/2 passed)
+  - [x] Test suite: Backend pytest `backend/test_contest_expiry.py` (3/3 passed) & Frontend Vitest `frontend/src/ProblemPage.test.tsx` (2/2 passed)
 - [x] **Per-Question Time Calculation** *(Phase 4 — COMPLETE)*:
   - [x] Backend logic in `backend/app/routers/submissions.py`: computes `solve_time_seconds = (sub.created_at - batch.timer_started_at)` upon 'AC' verdict
   - [x] Persisted `solve_time_seconds` integer in `Submission` table and exposed in `SubmissionResponse` schema

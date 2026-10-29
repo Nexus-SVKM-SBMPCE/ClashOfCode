@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Mock monacoSetup to avoid initializing Monaco's clipboard in JSDOM
+vi.mock('./monacoSetup', () => ({}));
+vi.mock('../monacoSetup', () => ({}));
+
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import ProblemPage from './pages/ProblemPage';
 import { useCountdownTimer, type CountdownState } from './useCountdownTimer';
 
-// Mock react-router-dom
+// Mock react-router-dom useParams
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
   return {
@@ -26,8 +32,10 @@ vi.mock('./api', () => ({
       sample_test_cases: [],
     },
   }),
+  getProblems: vi.fn().mockResolvedValue({ data: [] }),
   getMySubmissions: vi.fn().mockResolvedValue({ data: [] }),
   submitCode: vi.fn().mockResolvedValue({ data: {} }),
+  demoMode: { enabled: false },
 }));
 
 // Mock useCountdownTimer
@@ -66,7 +74,11 @@ describe('ProblemPage — Contest Expiry & Submission Freeze', () => {
     };
     vi.mocked(useCountdownTimer).mockReturnValue(activeState);
 
-    render(<ProblemPage />);
+    render(
+      <MemoryRouter>
+        <ProblemPage />
+      </MemoryRouter>
+    );
 
     // Wait for problem to load
     await waitFor(() => {
@@ -78,7 +90,7 @@ describe('ProblemPage — Contest Expiry & Submission Freeze', () => {
     expect(editor.getAttribute('data-readonly')).toBe('false');
 
     // Submit button must be enabled
-    const submitBtn = screen.getByRole('button', { name: /Submit/i }) as HTMLButtonElement;
+    const submitBtn = screen.getByRole('button', { name: /Attack|Submit/i }) as HTMLButtonElement;
     expect(submitBtn.disabled).toBe(false);
 
     // Battle Finished modal must NOT be rendered
@@ -95,7 +107,11 @@ describe('ProblemPage — Contest Expiry & Submission Freeze', () => {
     };
     vi.mocked(useCountdownTimer).mockReturnValue(completedState);
 
-    render(<ProblemPage />);
+    render(
+      <MemoryRouter>
+        <ProblemPage />
+      </MemoryRouter>
+    );
 
     // Wait for problem to load
     await waitFor(() => {
