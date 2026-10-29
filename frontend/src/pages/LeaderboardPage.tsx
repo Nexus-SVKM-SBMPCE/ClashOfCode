@@ -51,7 +51,7 @@ export default function LeaderboardPage() {
       <div className="page-inner" style={{ position: 'relative', zIndex: 2 }}>
         <div className="page-head">
           <div>
-            <h1 className="page-title">🏆 War Rankings</h1>
+            <h1 className="page-title">War Rankings</h1>
             <p className="page-sub">Ranked by battle score, then quests conquered, then time of last victorious submission.</p>
           </div>
           <div className="board-meta">
@@ -70,22 +70,22 @@ export default function LeaderboardPage() {
             <thead>
               <tr>
                 <th className="col-rank">Rank</th>
-                <th>Clan</th>
-                <th className="align-right">Score</th>
-                <th className="align-right">Conquered</th>
-                <th className="align-right col-secondary">Attacks</th>
-                <th className="align-right col-secondary">Last Victory</th>
+                <th className="col-clan">Clan</th>
+                <th className="align-right col-score">Score</th>
+                <th className="align-right col-conquered">Conquered</th>
+                <th className="align-right col-attacks">Attacks</th>
+                <th className="align-right col-victory">Last Victory</th>
               </tr>
             </thead>
             <tbody>
               {loading && Array.from({ length: 6 }, (_, i) => (
                 <tr key={`sk-${i}`} aria-hidden="true">
-                  <td><span className="skeleton" style={{ width: 24 }} /></td>
-                  <td><span className="skeleton" style={{ width: 140 }} /></td>
-                  <td className="align-right"><span className="skeleton" style={{ width: 40 }} /></td>
-                  <td className="align-right"><span className="skeleton" style={{ width: 30 }} /></td>
-                  <td className="align-right col-secondary"><span className="skeleton" style={{ width: 30 }} /></td>
-                  <td className="align-right col-secondary"><span className="skeleton" style={{ width: 60 }} /></td>
+                  <td className="col-rank"><span className="skeleton" style={{ width: 24 }} /></td>
+                  <td className="col-clan"><span className="skeleton" style={{ width: 140 }} /></td>
+                  <td className="align-right col-score"><span className="skeleton" style={{ width: 40 }} /></td>
+                  <td className="align-right col-conquered"><span className="skeleton" style={{ width: 30 }} /></td>
+                  <td className="align-right col-attacks"><span className="skeleton" style={{ width: 30 }} /></td>
+                  <td className="align-right col-victory"><span className="skeleton" style={{ width: 60 }} /></td>
                 </tr>
               ))}
               {board.map((e) => {
@@ -93,7 +93,7 @@ export default function LeaderboardPage() {
                 const isYou = user?.id === e.user_id;
                 return (
                   <tr key={e.user_id} className={`${podium} ${isYou ? 'is-you' : ''}`}>
-                    <td>
+                    <td className="col-rank">
                       <span className="rank">
                         <span className="rank-mark" aria-hidden="true" />
                         {e.rank <= 3 && e.total_score > 0 ? (
@@ -101,15 +101,19 @@ export default function LeaderboardPage() {
                         ) : e.rank}
                       </span>
                     </td>
-                    <td>
+                    <td className="col-clan">
                       <div className="team">
                         <span className="team-name">{e.display_name}{isYou && <span className="you-tag">YOU</span>}</span>
                       </div>
                     </td>
-                    <td className="align-right"><span className="score mono">{e.total_score}</span></td>
-                    <td className="align-right mono">{e.solved_count}</td>
-                    <td className="align-right col-secondary mono">{e.total_submissions}</td>
-                    <td className="align-right col-secondary meta">{e.last_ac_time ? new Date(e.last_ac_time).toLocaleTimeString() : '—'}</td>
+                    <td className="align-right col-score"><span className="score mono">{e.total_score}</span></td>
+                    <td className="align-right col-conquered mono">{e.solved_count}</td>
+                    <td className="align-right col-attacks mono">{e.total_submissions}</td>
+                    <td className="align-right col-victory">
+                      <span className="last-victory-text">
+                        {e.last_ac_time ? new Date(e.last_ac_time).toLocaleTimeString() : '—'}
+                      </span>
+                    </td>
                   </tr>
                 );
               })}

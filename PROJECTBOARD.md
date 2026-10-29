@@ -129,17 +129,20 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
 - [x] **Clash of Clans Theme Design Tokens**:
   - [x] Define CoC color tokens: Gold (`#f5a623`/`#ffd700`), Elixir (`#d946ef`), Dark Elixir (`#0a0e1a`/`#141b2d`), Stone/Wood backgrounds — full palette in `index.css` `:root`
   - [x] Style 3D tactile buttons with raised beveled gold gradients, stone borders, and battle hover glows (`.btn`, `.btn-primary` with multi-layer box-shadows)
-  - [x] Implement clan badge shields (`.balloon` → shield-shaped with `border-radius: 4px 4px 50% 50%`), war trophy ranking marks, fantasy typography (Cinzel + MedievalSharp Google Fonts)
-- [x] **Thematic Page Reskin**:
-  - [x] Login Page: Clan War entrance portal with battlefield background (`coc-bg.jpg`), golden shimmer form border, CoC logo (`coc-logo.jpg`), "Enter the Arena" CTA, floating ember effects
-  - [x] Problems Dashboard: "⚔️ Battle Quests" with war-themed labels ("Conquered", "Quests"), gold gradient page titles, quest-board styled table with golden hover highlights
-  - [x] Code Editor Workspace: Fantasy "Forge" command center with dark fortress Monaco theme (gold keywords, elixir types), "⚔️ Attack" submit button, "Briefing/My Attacks" tabs, CoC-styled verdict strip
-  - [x] Leaderboard Arena: "🏆 War Rankings" with golden shield podiums (🥇🥈🥉), clan terminology, glowing gold score text, gold-highlighted "YOU" row
+  - [x] Custom language dropdown selector with 3D beveled stone-and-gold styling in code editor
+  - [x] Clean offline typography: bundled Inter and JetBrains Mono fonts (zero external CDN calls)
+- [x] **Thematic Page Reskin & Event Branding**:
+  - [x] Official Clash of Code Event Logo integrated into Navbar and Login portal
+  - [x] Login Page: Clan War entrance portal with Valkyrie (bottom-left, 320px) and Giant (bottom-right, 280px)
+  - [x] Problems Dashboard: "Battle Quests" with animated battlefield backdrop, rising war embers, and Barbarian King (bottom-left, 240px)
+  - [x] Navbar: Clean game-HUD styling, pill tabs, zero emojis
+  - [x] War Rankings Arena: Clean "War Rankings" header, fixed 6th column alignment, enhanced podium (🥇🥈🥉), and 15px readable table text
+  - [x] Scale-Invariant Characters: Hardware-accelerated GPU zoom compensation hook (`useFixedZoomRef`) ensuring constant physical dimensions with zero glitching
 - [x] **Animations & Effects**:
-  - [x] Torch flicker on header edges, gold shimmer on login form, floating ember radial gradients
-  - [x] Shield solve animation (3D flip), sword slash logo entrance, glow pulse, banner wave
+  - [x] Gold shimmer on login form, floating ember radial gradients, drifting battlefield fog
+  - [x] Shield solve animation (3D flip), sword slash logo entrance, glow pulse
   - [x] All transitions respect `prefers-reduced-motion: reduce`
-- Verification: `tsc --noEmit` exit 0, `vite build` exit 0, all pages themed consistently
+- Verification: `npm run build` exit 0, `python backend/test_import.py` exit 0, all pages verified
 
 ### Sanchita's Tracker (`branch: sanchita`)
 - [ ] **Per-Batch 1-Hour Countdown Timer**:

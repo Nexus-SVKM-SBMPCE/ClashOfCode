@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { useFixedZoomRef } from '../hooks/useFixedZoom';
 import Balloon from '../components/Balloon';
 import Icon from '../components/Icon';
 import { balloonFor, letterFor } from '../lib/arena';
@@ -12,6 +13,8 @@ const DEMO_ACCOUNTS = [
 
 export default function LoginPage() {
   const { user, signIn } = useAuth();
+  const leftCharRef = useFixedZoomRef<HTMLDivElement>('bottom left');
+  const rightCharRef = useFixedZoomRef<HTMLDivElement>('bottom right');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -35,15 +38,33 @@ export default function LoginPage() {
 
   return (
     <div className="login">
+      {/* Female character (Archer Queen / Valkyrie) on left bottom corner */}
+      <div
+        ref={leftCharRef}
+        className="login-char-left"
+        aria-hidden="true"
+      >
+        <img src="/valkyrie-transparent.png" alt="Valkyrie" className="login-char-img login-char-female" />
+      </div>
+
+      {/* Giant character on right bottom corner */}
+      <div
+        ref={rightCharRef}
+        className="login-char-right"
+        aria-hidden="true"
+      >
+        <img src="/giant-transparent.png" alt="Giant" className="login-char-img login-char-giant" />
+      </div>
+
       <div className="login-card">
         <div className="login-brand">
-          {/* CoC Logo */}
-          <img src="/coc-logo.jpg" alt="Clash of Code" className="login-logo" />
+          {/* Clash of Code Official Event Logo */}
+          <img src="/clash-of-code-logo.png" alt="Clash of Code" className="login-logo" />
 
           <div className="login-balloons" aria-hidden="true">
             {[0, 1, 2, 3, 4].map((i) => <Balloon key={i} letter={letterFor(i)} color={balloonFor(i)} />)}
           </div>
-          <h1 className="login-title">Clash of Code <span>⚔️ Battle Arena</span></h1>
+          <h1 className="login-title">Clash of Code</h1>
           <p className="login-lede">Enter your clan credentials to join the war.</p>
         </div>
 
@@ -86,7 +107,7 @@ export default function LoginPage() {
             </p>
           )}
           <button id="login-btn" type="submit" className="btn btn-primary btn-lg" disabled={loading}>
-            {loading ? <><span className="spinner" /> Entering Battle…</> : '⚔️ Enter the Arena'}
+            {loading ? <><span className="spinner" /> Entering Battle…</> : 'Enter the Arena'}
           </button>
         </form>
 

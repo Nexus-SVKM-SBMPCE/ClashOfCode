@@ -393,9 +393,12 @@ export default function ProblemPage() {
           <div className="editor-toolbar">
             <span className="editor-file"><Icon name="file" size={14} />solution.{ext}</span>
             <label htmlFor="language-select" className="sr-only">Weapon</label>
-            <select id="language-select" className="select" value={lang} onChange={(e) => setLang(e.target.value)} disabled={submitting}>
-              {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
-            </select>
+            <div className="lang-picker">
+              <span className="lang-picker-icon" aria-hidden="true">⚔️</span>
+              <select id="language-select" className="select lang-select" value={lang} onChange={(e) => setLang(e.target.value)} disabled={submitting}>
+                {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+              </select>
+            </div>
             <button id="submit-btn" className="btn btn-primary" onClick={submit} disabled={submitting} title="Attack (Ctrl+Enter)">
               {submitting ? <><span className="spinner" /> Battling…</> : <>⚔️ Attack <kbd>Ctrl ↵</kbd></>}
             </button>

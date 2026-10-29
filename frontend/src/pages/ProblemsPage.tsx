@@ -1,6 +1,7 @@
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { useArena } from '../lib/arena';
+import { useFixedZoomRef } from '../hooks/useFixedZoom';
 import Balloon from '../components/Balloon';
 import Difficulty from '../components/Difficulty';
 import Icon from '../components/Icon';
@@ -38,6 +39,7 @@ function QuestsBackground() {
 
 export default function ProblemsPage() {
   const { user } = useAuth();
+  const kingRef = useFixedZoomRef<HTMLDivElement>('bottom left');
   // An admin's submission list spans every team, so solved state is only shown to contestants.
   const isContestant = user?.role !== 'admin';
   const { problems, status, loading, error } = useArena(isContestant);
@@ -49,8 +51,12 @@ export default function ProblemsPage() {
       {/* Creative animated battlefield background */}
       <QuestsBackground />
 
-      {/* Static Barbarian King stationed firmly at bottom-left in big size */}
-      <div className="quests-king" aria-hidden="true">
+      {/* Static Barbarian King stationed firmly at bottom-left with fixed scale */}
+      <div
+        ref={kingRef}
+        className="quests-king"
+        aria-hidden="true"
+      >
         <img
           src="/barbarian-king-transparent.png"
           alt="Barbarian King"
@@ -61,7 +67,7 @@ export default function ProblemsPage() {
       <div className="page-inner" style={{ position: 'relative', zIndex: 2 }}>
         <div className="page-head">
           <div>
-            <h1 className="page-title">⚔️ Battle Quests</h1>
+            <h1 className="page-title">Battle Quests</h1>
             <p className="page-sub">
               {loading ? 'Summoning challenges from the war council…'
                 : isContestant ? `${solvedCount} of ${problems.length} quests conquered`
