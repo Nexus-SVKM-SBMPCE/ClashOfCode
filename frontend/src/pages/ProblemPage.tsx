@@ -6,6 +6,8 @@ import Editor, { type BeforeMount } from '@monaco-editor/react';
 import '../monacoSetup';
 import { getProblem, submitCode, getMySubmissions, demoMode } from '../api';
 import type { ProblemDetail, Submission } from '../api';
+import { useCountdownTimer } from '../useCountdownTimer';
+import BattleFinishedModal from '../BattleFinishedModal';
 import { useToast } from '../Toast';
 import { useAuth } from '../AuthContext';
 import { useArena } from '../lib/arena';
@@ -177,10 +179,15 @@ const MD_COMPONENTS: Components = {
 
 export default function ProblemPage() {
   const { slug } = useParams<{ slug: string }>();
+  // Sanchita: contest expiry — lock editor and show modal when COMPLETED
+  const { status: timerStatus } = useCountdownTimer();
+  const isContestEnded = timerStatus === 'COMPLETED';
+
   const { addToast } = useToast();
   const { user } = useAuth();
   // An admin's submission list spans every team, so solved balloons are contestant-only.
   const { problems, status } = useArena(user?.role !== 'admin');
+
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lang, setLang] = useState('python');
@@ -220,7 +227,7 @@ export default function ProblemPage() {
   }, [split]);
 
   const submit = useCallback(async () => {
-    if (!slug || submitting) return;
+    if (!slug || submitting || isContestEnded) return;
     setSubmitting(true);
     setLastResult(null);
     try {
@@ -238,7 +245,7 @@ export default function ProblemPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [slug, lang, code, submitting, addToast]);
+  }, [slug, lang, code, submitting, isContestEnded, addToast]);
 
   // Monaco registers its keybinding once, so route it through a ref to the latest submit
   const submitRef = useRef(submit);
@@ -275,6 +282,9 @@ export default function ProblemPage() {
 
   return (
     <div className="workspace" data-pane={pane}>
+      {/* Sanchita: unclosable modal when contest has ended */}
+      {isContestEnded && <BattleFinishedModal />}
+
       {/* Problem rail: jump between problems; balloons fill once solved */}
       <nav className="problem-rail" aria-label="Quests">
         <Link to="/problems" className="btn btn-ghost btn-icon rail-back" aria-label="All quests" title="All quests">
@@ -393,11 +403,23 @@ export default function ProblemPage() {
           <div className="editor-toolbar">
             <span className="editor-file"><Icon name="file" size={14} />solution.{ext}</span>
             <label htmlFor="language-select" className="sr-only">Weapon</label>
-            <select id="language-select" className="select" value={lang} onChange={(e) => setLang(e.target.value)} disabled={submitting}>
+            <select id="language-select" className="select" value={lang} onChange={(e) => setLang(e.target.value)} disabled={submitting || isContestEnded}>
               {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
             </select>
-            <button id="submit-btn" className="btn btn-primary" onClick={submit} disabled={submitting} title="Attack (Ctrl+Enter)">
-              {submitting ? <><span className="spinner" /> Battling…</> : <>⚔️ Attack <kbd>Ctrl ↵</kbd></>}
+            {/* Sanchita: disable submit when contest ended */}
+            <button
+              id="submit-btn"
+              className="btn btn-primary"
+              onClick={submit}
+              disabled={submitting || isContestEnded}
+              title={isContestEnded ? 'Contest has ended. Submissions are closed.' : 'Attack (Ctrl+Enter)'}
+            >
+              {isContestEnded
+                ? '⏱ Contest Ended'
+                : submitting
+                  ? <><span className="spinner" /> Battling…</>
+                  : <>⚔️ Attack <kbd>Ctrl ↵</kbd></>
+              }
             </button>
           </div>
 
@@ -427,6 +449,8 @@ export default function ProblemPage() {
                 renderLineHighlight: 'line',
                 cursorBlinking: 'smooth',
                 automaticLayout: true,
+                // Sanchita: lock editor when contest has ended
+                readOnly: isContestEnded,
               }}
             />
           </div>

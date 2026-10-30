@@ -142,20 +142,36 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
 - Verification: `tsc --noEmit` exit 0, `vite build` exit 0, all pages themed consistently
 
 ### Sanchita's Tracker (`branch: sanchita`)
-- [ ] **Per-Batch 1-Hour Countdown Timer**:
-  - [ ] Store batch start time & 60-minute duration in `Batch` database table
-  - [ ] Implement live synced countdown timer (`HH:MM:SS`) in the client navbar
-- [ ] **Admin Timer Control & Problem Locking**:
-  - [ ] Add `POST /api/admin/batches/{batch_id}/start-timer` endpoint
-  - [ ] Restrict problem visibility: contestants cannot see problems until timer for their batch is started
-  - [ ] Display "Waiting for Battle to Begin" screen before timer starts
-- [ ] **Contest Expiry & Submission Freeze**:
-  - [ ] Display unclosable "Battle Finished / Event Ended" popup modal when timer hits 00:00:00
-  - [ ] Disable Monaco editor and lock Run/Submit buttons upon expiration
-  - [ ] Backend validator rejecting submissions received after batch deadline (HTTP 400)
-- [ ] **Per-Question Time Calculation**:
-  - [ ] Calculate elapsed seconds from batch start to successful solve for each problem
-  - [ ] Store `solve_time_seconds` in `Submission` table for tie-breakers and analytics
+- [x] **Per-Batch 1-Hour Countdown Timer** *(Phase 1 — COMPLETE)*:
+  - [x] Added `Batch` model with `timer_started_at` (UTC), `duration_minutes` (default 60), `status` (NOT_STARTED/ACTIVE/COMPLETED) — `backend/app/models.py`
+  - [x] Added `solve_time_seconds` + `batch_id` to `Submission` model for per-question time tracking
+  - [x] Created `backend/app/routers/batches.py` — `GET /api/batches/my-batch/timer` (server-synced clock), `POST /api/admin/batches/{batch_id}/start-timer`, batch CRUD
+  - [x] Added `GET /api/server-time` endpoint in `main.py` for initial clock skew calibration
+  - [x] Seeded default Batch 1 (NOT_STARTED) in `seeder.py`
+  - [x] Created `frontend/src/useCountdownTimer.ts` — server-synced hook (skew-corrected, re-polls every 30s, ticks every 1s)
+  - [x] Integrated `BatchTimer` component into `frontend/src/Navbar.tsx` (4 visual states: loading / waiting / active+pulse / ended)
+  - [x] Added timer CSS with urgency pulse animation (≤5 min amber glow) in `index.css`
+  - [x] TypeScript: `tsc --noEmit --skipLibCheck` exits 0; Python: all syntax OK
+- [x] **Admin Timer Control & Problem Locking** *(Phase 2 — COMPLETE)*:
+  - [x] `POST /api/admin/batches/{batch_id}/start-timer` already built in Phase 1 (`batches.py`) — sets `timer_started_at = UTC now`, status → ACTIVE
+  - [x] Backend lock in `problems.py`: `_assert_batch_active()` — contestants get **HTTP 423 Locked** when no ACTIVE batch exists; admins bypass always
+  - [x] `frontend/src/BatchGate.tsx` — route-level guard wrapping `/problems` and `/problems/:slug`; fail-closed (error state → locked)
+  - [x] `frontend/src/pages/WaitingScreen.tsx` — animated "Arena is Locked" screen with floating castle icon, pulse rings, batch badge, live status dot
+  - [x] `frontend/src/App.tsx` — `BatchGate` injected around both problem routes inside `RequireAuth`
+  - [x] `isBatchLocked(err)` helper in `api.ts` for clean 423 detection
+  - [x] CSS for WaitingScreen + BatchGate spinner added to `index.css`
+  - [x] TypeScript: `tsc --noEmit --skipLibCheck` exits 0; Python: all syntax OK
+- [x] **Contest Expiry & Submission Freeze** *(Phase 3 — COMPLETE)*:
+  - [x] Created `frontend/src/BattleFinishedModal.tsx` — unclosable "Battle Finished" modal rendered on `COMPLETED` timer status
+  - [x] Updated `frontend/src/pages/ProblemPage.tsx` — Monaco editor set to `readOnly: true`, Submit button disabled with "⏱ Contest Ended"
+  - [x] Styled modal in `frontend/src/index.css` with Clash of Clans dark fantasy overlay, gold border, and red status badge
+  - [x] Backend validator `_validate_submission_deadline` in `backend/app/routers/submissions.py` — rejects submissions after `timer_started_at + duration_minutes` or when `COMPLETED` with HTTP 400 "Submission deadline passed"
+  - [x] Test suite: Backend pytest `backend/test_contest_expiry.py` (3/3 passed) & Frontend Vitest `frontend/src/ProblemPage.test.tsx` (2/2 passed)
+- [x] **Per-Question Time Calculation** *(Phase 4 — COMPLETE)*:
+  - [x] Backend logic in `backend/app/routers/submissions.py`: computes `solve_time_seconds = (sub.created_at - batch.timer_started_at)` upon 'AC' verdict
+  - [x] Persisted `solve_time_seconds` integer in `Submission` table and exposed in `SubmissionResponse` schema
+  - [x] Updated `backend/app/routers/leaderboard.py`: aggregates total solve time per user based exclusively on their first successful AC per problem for tie-breaking
+  - [x] Verified via automated test suite `backend/test_solve_time.py` (3/3 passed: AC persistence, non-AC exclusion, multiple-solve first-AC tie-breaking)
 
 ### Vatsal's Tracker (`branch: vatsal`)
 - [x] **Live Submission Counter**:

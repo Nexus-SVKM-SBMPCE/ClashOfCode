@@ -2,7 +2,7 @@
 Leaderboard router: server-side score aggregation.
 Score per problem = best granular score across the team's submissions
 (test-case marks + difficulty bonus, see app/scoring.py).
-Ranks by: total score DESC, solved count DESC, then earliest time the final score was reached ASC.
+Ranks by: total score DESC, solved count DESC, total solve time ASC (fastest solve time wins tie-break), last AC time ASC.
 """
 from typing import Any, Dict, List, Optional
 from sqlmodel import Session, select, func
@@ -52,15 +52,17 @@ def get_leaderboard(
             ):
                 best_score[pid] = {"score": sub.score, "time": sub.created_at}
             if sub.verdict == "AC":
-                # Keep earliest AC per problem
+                # Keep earliest AC per problem (first successful solve time considered)
                 if pid not in solved_problems or sub.created_at < solved_problems[pid]["time"]:
                     solved_problems[pid] = {
                         "time": sub.created_at,
                         "runtime_ms": sub.runtime_ms,
+                        "solve_time_seconds": sub.solve_time_seconds or 0,
                     }
 
         total_score = sum(v["score"] for v in best_score.values())
         total_submissions = len(user_subs)
+        total_solve_time = sum(v["solve_time_seconds"] for v in solved_problems.values())
         last_ac_time = (
             max(v["time"] for v in solved_problems.values()).isoformat()
             if solved_problems else None
@@ -78,15 +80,17 @@ def get_leaderboard(
             "solved_count": len(solved_problems),
             "total_submissions": total_submissions,
             "last_ac_time": last_ac_time,
+            "total_solve_time_seconds": total_solve_time,
             "_last_score_time": last_score_time,
         })
 
-    # Sort: score DESC, solved DESC, last AC time ASC (earlier is better)
+    # Sort: score DESC, solved DESC, total solve time ASC (fastest solve time wins tie-break), last AC time ASC
     rows.sort(
         key=lambda r: (
             -r["total_score"],
             -r["solved_count"],
-            r["_last_score_time"] or "9999",
+            r["total_solve_time_seconds"],
+            r["last_ac_time"] or "9999",
         )
     )
 
