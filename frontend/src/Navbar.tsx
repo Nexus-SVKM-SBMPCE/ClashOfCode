@@ -73,17 +73,17 @@ export default function Navbar() {
   return (
     <header className="app-header">
       <NavLink to="/problems" className="wordmark">
-        <span className="wordmark-mark" aria-hidden="true">⚔️</span>
+        <img src="/clash-of-code-logo.png" alt="Clash of Code" className="navbar-logo" />
         <span className="wordmark-name">Clash of Code</span>
         <span className="wordmark-sub">Battle Arena</span>
       </NavLink>
 
       <nav className="header-nav" aria-label="Main">
         <NavLink to="/problems" className={({ isActive }) => (isActive ? 'active' : '')}>
-          <Icon name="list" size={15} /> Quests
+          Quests
         </NavLink>
         <NavLink to="/leaderboard" className={({ isActive }) => (isActive ? 'active' : '')}>
-          <Icon name="trophy" size={15} /> War Ranks
+          War Ranks
         </NavLink>
       </nav>
 
@@ -94,12 +94,14 @@ export default function Navbar() {
         {/* Live submission counter sits right beside the timer */}
         <LiveSubmissionCounter />
 
-        <label className="switch" title="Offline Demo Mode — intercepts all API calls with mock data">
-          <input id="demo-mode-toggle" type="checkbox" checked={demo} onChange={toggleDemo} />
-          <span className="switch-track" aria-hidden="true" />
-          <span className="switch-label">Demo</span>
-          <span className="sr-only">Demo mode</span>
-        </label>
+        <button
+          type="button"
+          className={`btn-demo-toggle ${demo ? 'active' : ''}`}
+          onClick={toggleDemo}
+          title="Toggle client-only demo data simulation"
+        >
+          {demo ? 'Demo ON' : 'Demo OFF'}
+        </button>
 
         {user && (
           <div className="identity">
