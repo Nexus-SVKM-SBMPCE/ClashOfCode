@@ -7,6 +7,11 @@ from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship, create_engine, Session
 from app.config import DATABASE_URL
 
+# Status literals for Batch
+BATCH_STATUS_NOT_STARTED = "NOT_STARTED"
+BATCH_STATUS_ACTIVE = "ACTIVE"
+BATCH_STATUS_COMPLETED = "COMPLETED"
+
 # ---------------------------------------------------------------------------
 # Engine
 # ---------------------------------------------------------------------------
@@ -40,6 +45,8 @@ _SUBMISSION_COLUMNS = {
     "bonus_points": "INTEGER NOT NULL DEFAULT 0",
     "tests_passed": "INTEGER NOT NULL DEFAULT 0",
     "tests_total": "INTEGER NOT NULL DEFAULT 0",
+    "solve_time_seconds": "INTEGER DEFAULT NULL",
+    "batch_id": "INTEGER DEFAULT NULL",
 }
 
 
@@ -107,6 +114,25 @@ class TestCase(SQLModel, table=True):
 
 
 # ---------------------------------------------------------------------------
+# Batch — per-batch contest timer and metadata
+# ---------------------------------------------------------------------------
+class Batch(SQLModel, table=True):
+    """Represents a contest batch. Each batch has its own 60-minute countdown.
+    status: NOT_STARTED | ACTIVE | COMPLETED
+    timer_started_at: UTC timestamp when admin triggered the batch start.
+    """
+    __tablename__ = "batches"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    batch_number: int = Field(index=True)           # e.g. 1, 2, 3 …
+    name: str = Field(max_length=100)               # Display name, e.g. "Batch A"
+    status: str = Field(default=BATCH_STATUS_NOT_STARTED)  # NOT_STARTED | ACTIVE | COMPLETED
+    timer_started_at: Optional[datetime] = None     # UTC — set when admin fires start-timer
+    duration_minutes: int = Field(default=60)       # Contest window in minutes (default 1 h)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# ---------------------------------------------------------------------------
 # Submission
 # ---------------------------------------------------------------------------
 class Submission(SQLModel, table=True):
@@ -132,6 +158,10 @@ class Submission(SQLModel, table=True):
     compile_error: Optional[str] = None        # CE message (shown to submitter only)
     judged_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # Per-question solve time for tie-breaking (seconds elapsed from batch start to first AC)
+    solve_time_seconds: Optional[int] = None    # NULL until the submission is AC
+    batch_id: Optional[int] = Field(default=None, foreign_key="batches.id", index=True)
 
     user: Optional[User] = Relationship(back_populates="submissions")
     problem: Optional[Problem] = Relationship(back_populates="submissions")

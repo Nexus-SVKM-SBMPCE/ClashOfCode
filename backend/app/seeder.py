@@ -3,7 +3,7 @@ Database seeder: demo accounts, sample DSA problems, and hidden test cases.
 Safe to run multiple times (idempotent).
 """
 from sqlmodel import Session, select
-from app.models import User, Problem, TestCase
+from app.models import User, Problem, TestCase, Batch, BATCH_STATUS_NOT_STARTED
 from app.auth import hash_password
 
 
@@ -269,3 +269,18 @@ def seed(session: Session) -> None:
                     is_sample=tc["is_sample"],
                 ))
     session.commit()
+
+    # -----------------------------------------------------------------------
+    # Seed default Batch 1 (NOT_STARTED — admin triggers it during the event)
+    # -----------------------------------------------------------------------
+    existing_batch = session.exec(
+        select(Batch).where(Batch.batch_number == 1)
+    ).first()
+    if not existing_batch:
+        session.add(Batch(
+            batch_number=1,
+            name="Batch 1",
+            duration_minutes=60,
+            status=BATCH_STATUS_NOT_STARTED,
+        ))
+        session.commit()

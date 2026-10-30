@@ -2,9 +2,62 @@ import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { demoMode } from './api';
+import { useCountdownTimer } from './useCountdownTimer';
 import LiveSubmissionCounter from './LiveSubmissionCounter';
 import Icon from './components/Icon';
 
+// ─── Timer display component ──────────────────────────────────────────────────
+function BatchTimer() {
+  const { displayTime, status, batchName, isPulsing } = useCountdownTimer();
+
+  if (status === 'loading') {
+    return (
+      <div className="batch-timer batch-timer--loading" aria-label="Loading timer">
+        <span className="timer-icon">⏱</span>
+        <span className="timer-display">--:--:--</span>
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return null; // silently hide on error; don't alarm contestants
+  }
+
+  if (status === 'NOT_STARTED') {
+    return (
+      <div className="batch-timer batch-timer--waiting" title={batchName}>
+        <span className="timer-icon">⏳</span>
+        <span className="timer-display timer-waiting">Waiting…</span>
+      </div>
+    );
+  }
+
+  if (status === 'COMPLETED') {
+    return (
+      <div className="batch-timer batch-timer--ended" title={batchName}>
+        <span className="timer-icon">🏁</span>
+        <span className="timer-display timer-ended">00:00:00</span>
+      </div>
+    );
+  }
+
+  // ACTIVE
+  return (
+    <div
+      className={`batch-timer batch-timer--active${isPulsing ? ' batch-timer--urgent' : ''}`}
+      title={`${batchName} — live countdown`}
+      aria-label={`Time remaining: ${displayTime}`}
+      aria-live="polite"
+    >
+      <span className="timer-icon">⚡</span>
+      <span className={`timer-display${isPulsing ? ' timer-pulsing' : ''}`}>
+        {displayTime}
+      </span>
+    </div>
+  );
+}
+
+// ─── Navbar ───────────────────────────────────────────────────────────────────
 export default function Navbar() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -35,7 +88,10 @@ export default function Navbar() {
       </nav>
 
       <div className="header-right">
-        {/* Batch countdown timer mounts here; the live counter sits right beside it */}
+        {/* Live countdown timer — only shown to authenticated users */}
+        {user && <BatchTimer />}
+
+        {/* Live submission counter sits right beside the timer */}
         <LiveSubmissionCounter />
 
         <button
