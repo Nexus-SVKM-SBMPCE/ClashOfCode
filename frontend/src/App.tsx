@@ -19,6 +19,16 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function RequireAdmin({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return (
+    <div className="splash"><span className="spinner" aria-label="Loading" /></div>
+  );
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'admin') return <Navigate to="/problems" replace />;
+  return <>{children}</>;
+}
+
 function AppLayout() {
   const { user, loading } = useAuth();
   return (
@@ -56,7 +66,7 @@ function AppLayout() {
               </RequireAuth>
             }
           />
-          <Route path="/leaderboard" element={<RequireAuth><LeaderboardPage /></RequireAuth>} />
+          <Route path="/leaderboard" element={<RequireAdmin><LeaderboardPage /></RequireAdmin>} />
           <Route path="*" element={<Navigate to="/problems" replace />} />
         </Routes>
       </main>

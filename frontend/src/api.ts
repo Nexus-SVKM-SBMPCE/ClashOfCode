@@ -75,6 +75,12 @@ export interface User {
   username: string;
   display_name: string;
   role: 'admin' | 'contestant';
+  team_id?: number | null;
+  team_name?: string | null;
+  batch_id?: number | null;
+  leader_name?: string | null;
+  leader_email?: string | null;
+  members_info?: string | null;
 }
 
 export interface Problem {
@@ -109,6 +115,31 @@ export interface Submission {
   judged_at: string | null;
 }
 
+export interface SampleTestResult {
+  sample_index: number;
+  test_case_id?: number | null;
+  input_data: string;
+  expected_output: string;
+  actual_output?: string | null;
+  stderr?: string | null;
+  compile_error?: string | null;
+  runtime_ms?: number | null;
+  memory_kb?: number | null;
+  verdict: string;
+  passed: boolean;
+}
+
+export interface RunResponse {
+  problem_slug: string;
+  language: string;
+  status: string;
+  verdict: string;
+  compile_error?: string | null;
+  samples_passed: number;
+  samples_total: number;
+  results: SampleTestResult[];
+}
+
 export interface SubmissionStats {
   total_submissions: number;
   accepted_today: number;
@@ -121,10 +152,36 @@ export interface LeaderboardEntry {
   user_id: number;
   username: string;
   display_name: string;
+  team_id?: number | null;
+  batch_id?: number | null;
   total_score: number;
   solved_count: number;
   total_submissions: number;
   last_ac_time: string | null;
+}
+
+export interface TeamAdminInfo {
+  id: number;
+  name: string;
+  username: string;
+  leader_name: string;
+  leader_email: string;
+  members_info?: string | null;
+  batch_id?: number | null;
+  batch_name?: string | null;
+  total_score: number;
+  created_at?: string | null;
+}
+
+export interface BatchAdminInfo {
+  id: number;
+  batch_number: number;
+  name: string;
+  status: 'NOT_STARTED' | 'ACTIVE' | 'COMPLETED';
+  timer_started_at: string | null;
+  duration_minutes: number;
+  remaining_seconds: number | null;
+  server_now_utc: string;
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -166,6 +223,38 @@ export const getProblem = (slug: string) => {
 };
 
 // ─── Submissions ──────────────────────────────────────────────────────────────
+export const runSampleCode = async (problem_slug: string, language: string, source_code: string) => {
+  if (demoMode.enabled) {
+    await delay(1200);
+    const problem = (MOCK_PROBLEM_DETAIL[problem_slug] as ProblemDetail) || (MOCK_PROBLEM_DETAIL['two-sum'] as ProblemDetail);
+    const samples = problem?.sample_test_cases || [];
+    const results: SampleTestResult[] = samples.map((tc, idx) => ({
+      sample_index: idx + 1,
+      input_data: tc.input_data,
+      expected_output: tc.expected_output,
+      actual_output: tc.expected_output,
+      verdict: 'AC',
+      passed: true,
+      runtime_ms: 45,
+      memory_kb: 12000,
+      stderr: '',
+      compile_error: null,
+    }));
+    const res: RunResponse = {
+      problem_slug,
+      language,
+      status: 'done',
+      verdict: 'AC',
+      compile_error: null,
+      samples_passed: results.length,
+      samples_total: results.length,
+      results,
+    };
+    return mockResp(res);
+  }
+  return api.post<RunResponse>('/api/submissions/run', { problem_slug, language, source_code });
+};
+
 export const submitCode = async (problem_slug: string, language: string, source_code: string) => {
   if (demoMode.enabled) {
     await delay(2000); // simulate judge execution
@@ -219,9 +308,85 @@ export const getMySubmissions = (problem_slug?: string) => {
 };
 
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
-export const getLeaderboard = () => {
-  if (demoMode.enabled) return mockResp(MOCK_LEADERBOARD as LeaderboardEntry[]);
-  return api.get<LeaderboardEntry[]>('/api/leaderboard');
+export const getLeaderboard = (batch_id?: number) => {
+  if (demoMode.enabled) {
+    let list = MOCK_LEADERBOARD as LeaderboardEntry[];
+    if (batch_id) {
+      list = list.filter((_, idx) => idx % 2 === batch_id % 2);
+    }
+    return mockResp(list);
+  }
+  return api.get<LeaderboardEntry[]>('/api/leaderboard', {
+    params: batch_id ? { batch_id } : {},
+  });
+};
+
+export const getAdminBatches = () => {
+  if (demoMode.enabled) {
+    return mockResp<BatchAdminInfo[]>([
+      { id: 1, batch_number: 1, name: 'Batch 1', status: 'ACTIVE', timer_started_at: new Date().toISOString(), duration_minutes: 60, remaining_seconds: 3200, server_now_utc: new Date().toISOString() },
+      { id: 2, batch_number: 2, name: 'Batch 2', status: 'NOT_STARTED', timer_started_at: null, duration_minutes: 60, remaining_seconds: null, server_now_utc: new Date().toISOString() },
+    ]);
+  }
+  return api.get<BatchAdminInfo[]>('/api/admin/batches');
+};
+
+export const getAdminTeams = () => {
+  if (demoMode.enabled) {
+    return mockResp<TeamAdminInfo[]>([
+      { id: 1, name: 'Code Clan', username: 'team1', leader_name: 'Alice Chen', leader_email: 'alice@clash.local', batch_id: 1, batch_name: 'Batch 1', total_score: 500 },
+      { id: 2, name: 'Byte Brawlers', username: 'team2', leader_name: 'Bob Patel', leader_email: 'bob@clash.local', batch_id: 1, batch_name: 'Batch 1', total_score: 400 },
+      { id: 3, name: 'Algo Assassins', username: 'team3', leader_name: 'Chloe Sharma', leader_email: 'chloe@clash.local', batch_id: 2, batch_name: 'Batch 2', total_score: 300 },
+      { id: 4, name: 'Bit Bandits', username: 'team4', leader_name: 'Dev Kumar', leader_email: 'dev@clash.local', batch_id: 2, batch_name: 'Batch 2', total_score: 200 },
+    ]);
+  }
+  return api.get<TeamAdminInfo[]>('/api/admin/teams');
+};
+
+export const assignTeamBatch = (team_id: number, batch_id: number | null) => {
+  if (demoMode.enabled) return mockResp({ message: 'Assigned', team_id, batch_id });
+  return api.post(`/api/admin/teams/${team_id}/assign-batch`, { batch_id });
+};
+
+export const autoAllotBatches = (teams_per_batch?: number, batch_ids?: number[]) => {
+  if (demoMode.enabled) return mockResp({ message: 'Allotted', allotted_count: 4 });
+  return api.post('/api/admin/batches/allot', { teams_per_batch, batch_ids });
+};
+
+export interface BatchProblemAdminInfo {
+  id: number;
+  slug: string;
+  title: string;
+  difficulty: string;
+  is_assigned: boolean;
+}
+
+export const getBatchProblems = (batch_id: number) => {
+  if (demoMode.enabled) {
+    return mockResp<BatchProblemAdminInfo[]>([
+      { id: 1, slug: 'two-sum', title: 'Two Sum', difficulty: 'medium', is_assigned: batch_id === 1 },
+      { id: 2, slug: 'fibonacci', title: 'Fibonacci Number', difficulty: 'easy', is_assigned: true },
+      { id: 3, slug: 'palindrome-check', title: 'Palindrome Check', difficulty: 'easy', is_assigned: batch_id === 2 },
+      { id: 4, slug: 'binary-search', title: 'Binary Search', difficulty: 'medium', is_assigned: batch_id === 2 },
+      { id: 5, slug: 'max-subarray', title: 'Maximum Subarray Sum', difficulty: 'hard', is_assigned: batch_id === 1 },
+    ]);
+  }
+  return api.get<BatchProblemAdminInfo[]>(`/api/admin/batches/${batch_id}/problems`);
+};
+
+export const setBatchProblems = (batch_id: number, problem_ids: number[]) => {
+  if (demoMode.enabled) return mockResp({ message: 'Updated', batch_id, problem_ids });
+  return api.post(`/api/admin/batches/${batch_id}/problems`, { problem_ids });
+};
+
+export const autoAllotBatchProblems = (problems_per_batch?: number) => {
+  if (demoMode.enabled) return mockResp({ message: 'Questions allotted', batches: {} });
+  return api.post('/api/admin/batches/allot-problems', { problems_per_batch });
+};
+
+export const startBatchTimer = (batch_id: number) => {
+  if (demoMode.enabled) return mockResp({ message: 'Started', batch_id });
+  return api.post(`/api/admin/batches/${batch_id}/start-timer`);
 };
 
 // ─── Batch Timer ──────────────────────────────────────────────────────────────

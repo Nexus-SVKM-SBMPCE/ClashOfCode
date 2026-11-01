@@ -16,13 +16,14 @@ from sqlmodel import Session, select, func
 from app.auth import get_current_user
 from app.config import SUPPORTED_LANGUAGES
 from app.database import get_session
-from app.judge import evaluate_submission, STATUS_CE
+from app.judge import evaluate_submission, evaluate_sample_submission, STATUS_CE
 from app.models import (
     Batch,
     Problem,
     Submission,
     TestCase,
     User,
+    Team,
     BATCH_STATUS_ACTIVE,
     BATCH_STATUS_COMPLETED,
     BATCH_STATUS_NOT_STARTED,
@@ -55,6 +56,31 @@ class SubmitRequest(BaseModel):
         if len(v) > 65_536:
             raise ValueError("Source code exceeds 64 KB limit")
         return v
+
+
+class SampleTestResult(BaseModel):
+    sample_index: int
+    test_case_id: Optional[int] = None
+    input_data: str
+    expected_output: str
+    actual_output: Optional[str] = None
+    stderr: Optional[str] = None
+    compile_error: Optional[str] = None
+    runtime_ms: Optional[float] = None
+    memory_kb: Optional[int] = None
+    verdict: str
+    passed: bool
+
+
+class RunResponse(BaseModel):
+    problem_slug: str
+    language: str
+    status: str
+    verdict: str
+    compile_error: Optional[str] = None
+    samples_passed: int
+    samples_total: int
+    results: List[SampleTestResult]
 
 
 class SubmissionResponse(BaseModel):
@@ -105,11 +131,23 @@ def _validate_submission_deadline(session: Session, user: User) -> Optional[Batc
     'Submission deadline passed'.
     """
     now = datetime.now(timezone.utc)
+    batch = None
 
-    # Fetch active batch first, fallback to the latest batch
-    batch = session.exec(
-        select(Batch).where(Batch.status == BATCH_STATUS_ACTIVE)
-    ).first()
+    # Check team batch assignment first
+    team = None
+    if getattr(user, "team_id", None):
+        team = session.get(Team, user.team_id)
+    elif getattr(user, "role", None) == "contestant":
+        team = session.exec(select(Team).where(Team.username == user.username)).first()
+
+    if team and team.batch_id:
+        batch = session.get(Batch, team.batch_id)
+
+    # Fallback to active batch or latest batch if no team allotment
+    if batch is None:
+        batch = session.exec(
+            select(Batch).where(Batch.status == BATCH_STATUS_ACTIVE)
+        ).first()
     if batch is None:
         batch = session.exec(select(Batch).order_by(Batch.id.desc())).first()
 
@@ -137,6 +175,72 @@ def _validate_submission_deadline(session: Session, user: User) -> Optional[Batc
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+@router.post("/run", response_model=RunResponse)
+def run_sample_submission(
+    body: SubmitRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> RunResponse:
+    # 0. Validate batch deadline
+    _validate_submission_deadline(session, current_user)
+
+    # Resolve problem
+    prob = session.exec(
+        select(Problem).where(Problem.slug == body.problem_slug, Problem.is_visible == True)  # noqa: E712
+    ).first()
+    if not prob:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Problem not found")
+
+    if current_user.role == "contestant":
+        team = session.get(Team, current_user.team_id) if current_user.team_id else session.exec(select(Team).where(Team.username == current_user.username)).first()
+        if team and team.batch_id:
+            assigned_pids = session.exec(select(BatchProblem.problem_id).where(BatchProblem.batch_id == team.batch_id)).all()
+            if assigned_pids and prob.id not in assigned_pids:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This quest is not allotted to your batch arena.")
+
+
+    if current_user.role == "contestant":
+        team = session.get(Team, current_user.team_id) if current_user.team_id else session.exec(select(Team).where(Team.username == current_user.username)).first()
+        if team and team.batch_id:
+            assigned_pids = session.exec(select(BatchProblem.problem_id).where(BatchProblem.batch_id == team.batch_id)).all()
+            if assigned_pids and prob.id not in assigned_pids:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This quest is not allotted to your batch arena.")
+
+
+    # Fetch ONLY sample test cases
+    sample_cases = session.exec(
+        select(TestCase)
+        .where(TestCase.problem_id == prob.id, TestCase.is_sample == True)  # noqa: E712
+        .order_by(TestCase.order_index)  # type: ignore[arg-type]
+    ).all()
+
+    if not sample_cases:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Problem has no sample test cases configured",
+        )
+
+    run_eval = evaluate_sample_submission(
+        source_code=body.source_code,
+        language=body.language,
+        sample_cases=sample_cases,
+        cpu_time_limit=prob.time_limit_sec,
+        memory_limit=prob.memory_limit_kb,
+        problem_slug=prob.slug,
+    )
+
+    return RunResponse(
+        problem_slug=body.problem_slug,
+        language=body.language,
+        status=run_eval["status"],
+        verdict=run_eval["verdict"],
+        compile_error=run_eval["compile_error"],
+        samples_passed=run_eval["samples_passed"],
+        samples_total=run_eval["samples_total"],
+        results=[SampleTestResult(**r) for r in run_eval["results"]],
+    )
+
+
 @router.post("", response_model=SubmissionResponse)
 def create_submission(
     body: SubmitRequest,
@@ -195,6 +299,7 @@ def create_submission(
             expected_output=tc.expected_output,
             cpu_time_limit=prob.time_limit_sec,
             memory_limit=prob.memory_limit_kb,
+            problem_slug=prob.slug,
         )
 
         verdict = result["verdict"]

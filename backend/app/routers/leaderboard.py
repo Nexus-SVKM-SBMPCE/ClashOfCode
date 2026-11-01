@@ -8,22 +8,37 @@ from typing import Any, Dict, List, Optional
 from sqlmodel import Session, select, func
 from fastapi import APIRouter, Depends
 
-from app.auth import get_current_user
+from app.auth import require_admin
 from app.database import get_session
-from app.models import Submission, Problem, User
+from app.models import Submission, Problem, User, Team
 
 router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
 
 
 @router.get("")
 def get_leaderboard(
+    batch_id: Optional[int] = None,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ) -> List[Dict[str, Any]]:
+    # Pre-fetch teams map by id and username
+    teams = session.exec(select(Team)).all()
+    team_by_id = {t.id: t for t in teams}
+    team_by_username = {t.username: t for t in teams}
+
     # Get all contestants (non-admin)
     users = session.exec(
         select(User).where(User.role == "contestant", User.is_active == True)  # noqa: E712
     ).all()
+
+    # Filter contestants if batch_id is specified
+    if batch_id is not None:
+        filtered_users = []
+        for u in users:
+            team = team_by_id.get(u.team_id) if u.team_id else team_by_username.get(u.username)
+            if team and team.batch_id == batch_id:
+                filtered_users.append(u)
+        users = filtered_users
 
     # Get all problems
     problems = session.exec(select(Problem).where(Problem.is_visible == True)).all()  # noqa: E712
@@ -32,14 +47,18 @@ def get_leaderboard(
     # For each user, calculate best submission per problem
     rows = []
     for user in users:
+        team = team_by_id.get(user.team_id) if user.team_id else team_by_username.get(user.username)
+
         # All done submissions for this user on visible problems
-        user_subs = session.exec(
-            select(Submission).where(
-                Submission.user_id == user.id,
-                Submission.status == "done",
-                Submission.problem_id.in_(problem_ids),  # type: ignore[attr-defined]
-            )
-        ).all()
+        sub_query = select(Submission).where(
+            Submission.user_id == user.id,
+            Submission.status == "done",
+            Submission.problem_id.in_(problem_ids),  # type: ignore[attr-defined]
+        )
+        if batch_id is not None:
+            sub_query = sub_query.where(Submission.batch_id == batch_id)
+
+        user_subs = session.exec(sub_query).all()
 
         solved_problems: Dict[int, dict] = {}
         best_score: Dict[int, dict] = {}
@@ -75,7 +94,9 @@ def get_leaderboard(
         rows.append({
             "user_id": user.id,
             "username": user.username,
-            "display_name": user.display_name,
+            "display_name": team.name if team else user.display_name,
+            "team_id": team.id if team else None,
+            "batch_id": team.batch_id if team else None,
             "total_score": total_score,
             "solved_count": len(solved_problems),
             "total_submissions": total_submissions,

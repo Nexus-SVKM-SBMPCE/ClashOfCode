@@ -1,4 +1,4 @@
-"""
+﻿"""
 SQLModel database models and engine configuration.
 Hidden test cases and reference solutions are never serialized to public API responses.
 """
@@ -49,15 +49,59 @@ _SUBMISSION_COLUMNS = {
     "batch_id": "INTEGER DEFAULT NULL",
 }
 
+_USER_COLUMNS = {
+    "team_id": "INTEGER DEFAULT NULL",
+}
+
 
 def _migrate_columns():
     from sqlalchemy import inspect, text
-    existing = {c["name"] for c in inspect(engine).get_columns("submissions")}
     with engine.begin() as conn:
-        for name, ddl in _SUBMISSION_COLUMNS.items():
-            if name not in existing:
-                conn.execute(text(f"ALTER TABLE submissions ADD COLUMN {name} {ddl}"))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_submissions_created_at ON submissions (created_at)"))
+        inspector = inspect(engine)
+        if inspector.has_table("submissions"):
+            sub_cols = {c["name"] for c in inspector.get_columns("submissions")}
+            for name, ddl in _SUBMISSION_COLUMNS.items():
+                if name not in sub_cols:
+                    conn.execute(text(f"ALTER TABLE submissions ADD COLUMN {name} {ddl}"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_submissions_created_at ON submissions (created_at)"))
+
+        if inspector.has_table("users"):
+            user_cols = {c["name"] for c in inspector.get_columns("users")}
+            for name, ddl in _USER_COLUMNS.items():
+                if name not in user_cols:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
+
+        if not inspector.has_table("batch_problems"):
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS batch_problems (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    batch_id INTEGER NOT NULL,
+                    problem_id INTEGER NOT NULL
+                )
+            """))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_batch_problems_batch_id ON batch_problems (batch_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_batch_problems_problem_id ON batch_problems (problem_id)"))
+
+
+# ---------------------------------------------------------------------------
+# Team — Single shared login per team (username + password)
+# ---------------------------------------------------------------------------
+class Team(SQLModel, table=True):
+    __tablename__ = "teams"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(max_length=100)                             # Team name, e.g. "Code Clan"
+    username: str = Field(index=True, unique=True, max_length=50) # Shared login username, e.g. "team1"
+    hashed_password: str                                          # Bcrypt hash of team password
+    leader_name: str = Field(max_length=100)                      # Team leader name
+    leader_email: str = Field(max_length=150)                     # Team leader email
+    members_info: Optional[str] = Field(default=None)             # JSON string of members info
+    batch_id: Optional[int] = Field(default=None, foreign_key="batches.id", index=True)
+    total_score: int = Field(default=0)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    batch: Optional["Batch"] = Relationship()
+    users: List["User"] = Relationship(back_populates="team")
 
 
 # ---------------------------------------------------------------------------
@@ -72,9 +116,11 @@ class User(SQLModel, table=True):
     display_name: str = Field(max_length=100)
     role: str = Field(default="contestant")   # "admin" | "contestant"
     is_active: bool = Field(default=True)
+    team_id: Optional[int] = Field(default=None, foreign_key="teams.id", index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     submissions: List["Submission"] = Relationship(back_populates="user")
+    team: Optional[Team] = Relationship(back_populates="users")
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +162,17 @@ class TestCase(SQLModel, table=True):
 # ---------------------------------------------------------------------------
 # Batch — per-batch contest timer and metadata
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# BatchProblem ? association between batches and allotted questions
+# ---------------------------------------------------------------------------
+class BatchProblem(SQLModel, table=True):
+    __tablename__ = "batch_problems"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    batch_id: int = Field(foreign_key="batches.id", index=True)
+    problem_id: int = Field(foreign_key="problems.id", index=True)
+
+
 class Batch(SQLModel, table=True):
     """Represents a contest batch. Each batch has its own 60-minute countdown.
     status: NOT_STARTED | ACTIVE | COMPLETED

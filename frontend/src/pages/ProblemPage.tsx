@@ -4,8 +4,8 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Editor, { type BeforeMount } from '@monaco-editor/react';
 import '../monacoSetup';
-import { getProblem, submitCode, getMySubmissions, demoMode } from '../api';
-import type { ProblemDetail, Submission } from '../api';
+import { getProblem, submitCode, runSampleCode, getMySubmissions, demoMode } from '../api';
+import type { ProblemDetail, Submission, RunResponse } from '../api';
 import { useCountdownTimer } from '../useCountdownTimer';
 import BattleFinishedModal from '../BattleFinishedModal';
 import { useToast } from '../Toast';
@@ -21,6 +21,179 @@ const LANGUAGES = [
   { id: 'c',      label: 'C (GCC 7.4)',   ext: 'c' },
   { id: 'java',   label: 'Java 13',        ext: 'java' },
 ];
+
+const PROBLEM_STARTERS: Record<string, Record<string, string>> = {
+  'two-sum': {
+    python: `class Solution:
+    def twoSum(self, nums: list[int], target: int) -> list[int]:
+        # Return 1-based indices [i, j]
+        pass
+`,
+    cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+class Solution {
+public:
+    vector<int> twoSum(vector<int>& nums, int target) {
+        // Return 1-based indices {i, j}
+        return {};
+    }
+};
+`,
+    java: `import java.util.*;
+
+class Solution {
+    public int[] twoSum(int[] nums, int target) {
+        // Return 1-based indices [i, j]
+        return new int[]{};
+    }
+}
+`,
+    c: `#include <stdio.h>
+#include <stdlib.h>
+
+int* twoSum(int* nums, int n, int target, int* returnSize) {
+    // Return 1-based indices [i, j]
+    return NULL;
+}
+`,
+  },
+  'fibonacci': {
+    python: `class Solution:
+    def fib(self, n: int) -> int:
+        # Return the n-th Fibonacci number
+        pass
+`,
+    cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+class Solution {
+public:
+    long long fib(int n) {
+        return 0;
+    }
+};
+`,
+    java: `import java.util.*;
+
+class Solution {
+    public long fib(int n) {
+        return 0;
+    }
+}
+`,
+    c: `#include <stdio.h>
+
+long long fib(int n) {
+    return 0;
+}
+`,
+  },
+  'palindrome-check': {
+    python: `class Solution:
+    def isPalindrome(self, s: str) -> bool:
+        # Return True if s is palindrome (ignoring case and non-alphanumeric)
+        pass
+`,
+    cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+class Solution {
+public:
+    bool isPalindrome(string s) {
+        return true;
+    }
+};
+`,
+    java: `import java.util.*;
+
+class Solution {
+    public boolean isPalindrome(String s) {
+        return true;
+    }
+}
+`,
+    c: `#include <stdio.h>
+#include <stdbool.h>
+
+bool isPalindrome(char* s) {
+    return true;
+}
+`,
+  },
+  'binary-search': {
+    python: `class Solution:
+    def search(self, nums: list[int], target: int) -> int:
+        # Return 1-based index of target, or -1
+        pass
+`,
+    cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+class Solution {
+public:
+    int search(vector<int>& nums, int target) {
+        return -1;
+    }
+};
+`,
+    java: `import java.util.*;
+
+class Solution {
+    public int search(int[] nums, int target) {
+        return -1;
+    }
+}
+`,
+    c: `#include <stdio.h>
+
+int search(int* nums, int n, int target) {
+    return -1;
+}
+`,
+  },
+  'max-subarray': {
+    python: `class Solution:
+    def maxSubArray(self, nums: list[int]) -> int:
+        # Return maximum contiguous subarray sum
+        pass
+`,
+    cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+class Solution {
+public:
+    long long maxSubArray(vector<int>& nums) {
+        return 0;
+    }
+};
+`,
+    java: `import java.util.*;
+
+class Solution {
+    public long maxSubArray(int[] nums) {
+        return 0;
+    }
+}
+`,
+    c: `#include <stdio.h>
+
+long long maxSubArray(int* nums, int n) {
+    return 0;
+}
+`,
+  },
+};
+
+const getStarterDrafts = (problemSlug?: string): Record<string, string> => {
+  const specific = problemSlug ? PROBLEM_STARTERS[problemSlug] : undefined;
+  return {
+    python: specific?.python || STARTERS.python,
+    cpp: specific?.cpp || STARTERS.cpp,
+    c: specific?.c || STARTERS.c,
+    java: specific?.java || STARTERS.java,
+  };
+};
 
 const STARTERS: Record<string, string> = {
   python: `# Read input and write output
@@ -192,12 +365,15 @@ export default function ProblemPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lang, setLang] = useState('python');
   // Per-language drafts so switching language never throws away work
-  const [drafts, setDrafts] = useState<Record<string, string>>(STARTERS);
+  const [drafts, setDrafts] = useState<Record<string, string>>(() => getStarterDrafts(slug));
   const code = drafts[lang];
   const setCode = (v: string) => setDrafts((d) => ({ ...d, [lang]: v }));
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [lastResult, setLastResult] = useState<Submission | null>(null);
+  const [running, setRunning] = useState(false);
+  const [runResult, setRunResult] = useState<RunResponse | null>(null);
+  const [selectedSampleTab, setSelectedSampleTab] = useState<number>(0);
   const [detailOpen, setDetailOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'problem' | 'submissions'>('problem');
   // Narrow screens show one pane at a time
@@ -213,7 +389,9 @@ export default function ProblemPage() {
     setProblem(null);
     setLoadError(null);
     setLastResult(null);
-    setDrafts(STARTERS);
+    setRunResult(null);
+    setRunning(false);
+    setDrafts(getStarterDrafts(slug));
     getProblem(slug)
       .then((r) => setProblem(r.data))
       .catch((e) => setLoadError(e.response?.status === 404 ? 'Quest not found in the war archives.' : 'Could not load this quest. Is the fortress backend running?'));
@@ -226,8 +404,31 @@ export default function ProblemPage() {
     try { localStorage.setItem(SPLIT_KEY, String(Math.round(split))); } catch { /* preference only */ }
   }, [split]);
 
+  const handleRun = useCallback(async () => {
+    if (!slug || running || submitting || isContestEnded) return;
+    setRunning(true);
+    setRunResult(null);
+    try {
+      const res = await runSampleCode(slug, lang, code);
+      setRunResult(res.data);
+      setSelectedSampleTab(0);
+      if (res.data.verdict === 'AC') {
+        addToast(`⚡ Sample Tests Passed (${res.data.samples_passed}/${res.data.samples_total})`, 'success');
+      } else if (res.data.verdict === 'CE') {
+        addToast('Spell Error on sample tests', 'error');
+      } else {
+        addToast(`Sample tests: ${res.data.samples_passed}/${res.data.samples_total} passed`, 'info');
+      }
+    } catch (e: any) {
+      const detail = e.response?.data?.detail;
+      addToast('Run failed: ' + (typeof detail === 'string' ? detail : e.message), 'error');
+    } finally {
+      setRunning(false);
+    }
+  }, [slug, lang, code, running, submitting, isContestEnded, addToast]);
+
   const submit = useCallback(async () => {
-    if (!slug || submitting || isContestEnded) return;
+    if (!slug || submitting || running || isContestEnded) return;
     setSubmitting(true);
     setLastResult(null);
     try {
@@ -409,12 +610,30 @@ export default function ProblemPage() {
                 {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
               </select>
             </div>
+            {/* Run Button (Sample Test Driver) */}
+            <button
+              id="run-btn"
+              className="btn btn-secondary"
+              onClick={handleRun}
+              disabled={running || submitting || isContestEnded}
+              title={isContestEnded ? 'Contest has ended.' : 'Run Sample Tests'}
+            >
+              {running ? (
+                <>
+                  <span className="spinner" /> Testing…
+                </>
+              ) : (
+                <>
+                  <Icon name="play" size={14} /> Run
+                </>
+              )}
+            </button>
             {/* Sanchita: disable submit when contest ended */}
             <button
               id="submit-btn"
               className="btn btn-primary"
               onClick={submit}
-              disabled={submitting || isContestEnded}
+              disabled={running || submitting || isContestEnded}
               title={isContestEnded ? 'Contest has ended. Submissions are closed.' : 'Attack (Ctrl+Enter)'}
             >
               {isContestEnded
@@ -458,6 +677,97 @@ export default function ProblemPage() {
             />
           </div>
 
+          {running && (
+            <div className="verdict-strip" role="status">
+              <div className="strip-row">
+                <span className="strip-verdict tone-pending"><span className="spinner" /> ⚡ Testing…</span>
+                <span className="strip-score">Testing your weapon against sample cases…</span>
+              </div>
+            </div>
+          )}
+          {runResult && !running && (
+            <div className="sample-run-console" role="region" aria-label="Sample test results">
+              <div className="console-head">
+                <div className="console-title">
+                  <span className={`verdict-tag verdict-${runResult.verdict.toLowerCase()}`}>
+                    {runResult.verdict === 'AC' ? '✓ Passed' : runResult.verdict === 'CE' ? 'Spell Error' : runResult.verdict}
+                  </span>
+                  <span className="console-summary">
+                    Sample Tests: <b>{runResult.samples_passed}/{runResult.samples_total}</b> passed
+                  </span>
+                </div>
+                <div className="console-actions">
+                  <span className="console-note">No points awarded · Local trial</span>
+                  <button className="btn btn-ghost btn-icon" onClick={() => setRunResult(null)} title="Dismiss console">
+                    <Icon name="x" size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {runResult.compile_error ? (
+                <pre className="strip-detail">{runResult.compile_error}</pre>
+              ) : runResult.results.length === 0 ? (
+                <div className="console-empty">No sample test cases found for this problem.</div>
+              ) : (
+                <>
+                  <div className="sample-tabs" role="tablist">
+                    {runResult.results.map((r, idx) => (
+                      <button
+                        key={idx}
+                        role="tab"
+                        className={`sample-tab ${selectedSampleTab === idx ? 'active' : ''} ${r.passed ? 'tab-pass' : 'tab-fail'}`}
+                        aria-selected={selectedSampleTab === idx}
+                        onClick={() => setSelectedSampleTab(idx)}
+                      >
+                        <span className="status-dot">{r.passed ? '✓' : '✗'}</span> Case {r.sample_index}
+                        {r.runtime_ms != null && <span className="tab-ms">{fmtRuntime(r.runtime_ms)}</span>}
+                      </button>
+                    ))}
+                  </div>
+
+                  {runResult.results[selectedSampleTab] && (
+                    <div className="sample-case-body">
+                      {(() => {
+                        const tc = runResult.results[selectedSampleTab];
+                        const isMatch = tc.passed;
+                        return (
+                          <>
+                            <div className="case-grid">
+                              <div className="case-block">
+                                <div className="case-block-label">
+                                  <span>Input</span>
+                                  <CopyButton text={tc.input_data} label={`Case ${tc.sample_index} Input`} />
+                                </div>
+                                <pre>{tc.input_data}</pre>
+                              </div>
+                              <div className="case-block">
+                                <div className="case-block-label">
+                                  <span>Expected Output</span>
+                                  <CopyButton text={tc.expected_output} label={`Case ${tc.sample_index} Expected`} />
+                                </div>
+                                <pre>{tc.expected_output}</pre>
+                              </div>
+                            </div>
+
+                            <div className="case-grid">
+                              <div className={`case-block ${isMatch ? 'output-match' : 'output-diff'}`}>
+                                <div className="case-block-label">
+                                  <span>Your Stdout {isMatch ? '(Match)' : '(Diff)'}</span>
+                                  {tc.actual_output && <CopyButton text={tc.actual_output} label={`Case ${tc.sample_index} Output`} />}
+                                </div>
+                                <pre>{tc.actual_output ?? '(no stdout recorded)'}</pre>
+                              </div>
+
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           {submitting && (
             <div className="verdict-strip" role="status">
               <div className="strip-row">

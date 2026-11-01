@@ -1,4 +1,4 @@
-# Project Board: Code Clash — Local Arena
+﻿# Project Board: Code Clash — Local Arena
 
 ## 1. Project Objective & Architecture
 
@@ -107,23 +107,61 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
 > **Rule for Team Agents**: Before opening a PR from your branch (`<your_name>`), you MUST execute unit/integration tests, verify no regressions on the baseplate, and check off your completed items below.
 
 ### Yash's Tracker (`branch: yash`)
-- [ ] **Run Button (Sample Test Runner)**:
-  - [ ] Add `POST /api/submissions/run` endpoint (runs only against `sample_test_cases`, does not persist score)
-  - [ ] Update `judge.py` with separate driver pipeline for sample evaluation
-  - [ ] Add "Run" button beside "Submit" in `ProblemPage.tsx`
-  - [ ] Display sample test case I/O results and user stdout in editor panel
-- [ ] **RBAC (Leaderboard Lockdown)**:
-  - [ ] Protect `/api/leaderboard` with role check (HTTP 403 for `contestant` role)
-  - [ ] Hide Leaderboard link from navbar and restrict `/leaderboard` route for contestants
-  - [ ] Ensure only `admin` role can view global and batch leaderboards
-- [ ] **Team Database & Single Team Shared Login**:
-  - [ ] Create `Team` model (`id`, `name`, `username`, `hashed_password`, `leader_name`, `leader_email`, `batch_id`, `total_score`)
-  - [ ] Migrate authentication so teams log in using their shared Team credentials
-  - [ ] Update seed data with sample teams across batches
-- [ ] **Batch-Wise Allotment & Batch Leaderboards**:
-  - [ ] Create `Batch` model (`id`, `batch_number`, `name`, `status`, `timer_started_at`, `duration_minutes`)
-  - [ ] Implement Admin batch management UI to view/assign teams to batches ($N$ batches of $X$ teams)
-  - [ ] Add batch filtering to leaderboard: `GET /api/leaderboard?batch_id=X`
+- [x] **Run Button (Sample Test Runner)**:
+  - [x] Add `POST /api/submissions/run` endpoint (runs only against `sample_test_cases`, does not persist score)
+  - [x] Update `judge.py` with separate driver pipeline (`evaluate_sample_submission`) for sample evaluation
+  - [x] Add "Run" button beside "Submit" in `ProblemPage.tsx` with disabled states synced with timer
+  - [x] Display sample test case I/O results, user stdout, and diff/runtime in editor console drawer
+  - [x] Verified: 5/5 backend tests in `tests/test_run_sample.py` & 3/3 frontend tests in `ProblemPage.test.tsx` (build clean, 0 TS errors)
+- [x] **RBAC (Leaderboard Lockdown)**:
+  - [x] Protect `/api/leaderboard` with role check (HTTP 403 for `contestant` role via `require_admin`)
+  - [x] Hide Leaderboard ("War Ranks") link from navbar for contestants
+  - [x] Restrict `/leaderboard` route via `RequireAdmin` guard redirecting unprivileged attempts to `/problems`
+  - [x] Verified: 5/5 backend tests in `tests/test_rbac_leaderboard.py` & 4/4 frontend tests in `frontend/src/RbacLeaderboard.test.tsx` (build clean, 0 TS errors)
+- [x] **Team Database & Single Team Shared Login**:
+  - [x] Create `Team` model (`id`, `name`, `username`, `hashed_password`, `leader_name`, `leader_email`, `members_info`, `batch_id`, `total_score`, `created_at`)
+  - [x] Migrate `/api/auth/login` to authenticate teams by shared credentials, issue team JWTs, and sync User records
+  - [x] Integrate `/api/auth/me` and `/api/batches/my-batch/timer` to resolve team batch assignment
+  - [x] Seed sample teams across Batch 1 and Batch 2 (`team1`–`team5`)
+  - [x] Verified: 7/7 backend tests in `tests/test_team_auth.py` (build clean, 0 TS errors)
+- [x] **Batch-Wise Allotment & Batch Leaderboards**:
+  - [x] Create `Batch` model (`id`, `batch_number`, `name`, `status`, `timer_started_at`, `duration_minutes`)
+  - [x] Implement Admin batch management UI to view/assign teams to batches ($N$ batches of $X$ teams)
+  - [x] Add batch filtering to leaderboard: `GET /api/leaderboard?batch_id=X`
+  - [x] Verified: 10/10 backend tests in `tests/test_batch_allotment_leaderboard.py` & 2/2 frontend tests in `BatchAllotmentLeaderboard.test.tsx` (build clean, 0 TS errors)
+- [x] **Hidden LeetCode-Style Driver Injection**:
+  - [x] `inject_hidden_driver(source_code, language, problem_slug)` in `judge.py` — auto-wraps `class Solution` style code with stdin-parsing driver for all 5 problems x 4 languages (Python, C++, Java, C)
+  - [x] Passthrough mode: if user code already has `main()` or raw `input()`, driver is NOT injected
+  - [x] `evaluate_local_submission()` — offline fallback using Python `subprocess` (graceful degradation when Judge0 is offline)
+  - [x] `evaluate_submission()` catches `requests.RequestException` and routes to local fallback — zero raw connection errors surfaced to users
+  - [x] Verified: 27/27 backend tests pass; `npm run build` exit 0, 0 TS errors
+- [x] **Clean Run Console (Stderr Removed)**:
+  - [x] Removed `Stderr / Debug Log` block from `ProblemPage.tsx` run result display
+  - [x] Console now shows only: Input, Expected Output, Your Stdout — no debug noise
+  - [x] Backend: `evaluate_sample_submission` always returns `"stderr": ""` for all result entries
+  - [x] Verified: `npm run build` exit 0, 0 TS errors; 27/27 backend tests pass
+- [x] **Batch-Wise Question Allotment (Admin Form)**:
+  - [x] `BatchProblem` SQLModel added to `models.py` (`batch_problems` table: `id, batch_id FK, problem_id FK`); auto-migrated on startup
+  - [x] Admin endpoints in `admin.py`: `GET /api/admin/batches/{id}/problems`, `POST /api/admin/batches/{id}/problems`, `POST /api/admin/batches/allot-problems`
+  - [x] `problems.py` — contestants filtered to only see their batch's allotted problems; non-allotted slugs return HTTP 403
+  - [x] `submissions.py` — Run and Submit both validate batch question allotment, block non-allotted with HTTP 403
+  - [x] Frontend `api.ts` — `BatchProblemAdminInfo` interface + `getBatchProblems`, `setBatchProblems`, `autoAllotBatchProblems` API functions
+  - [x] Admin UI in `LeaderboardPage.tsx` — 'Arena Quest Allotment' section with batch selector, problem checkbox table, Save + Auto-Split buttons
+  - [x] `ProblemPage.tsx` — LeetCode-style `PROBLEM_STARTERS` class skeletons auto-load per problem x language in Monaco editor
+  - [x] Verified: 27/27 backend tests pass; `npm run build` exit 0, 0 TS errors
+- [x] **LeetCode-Style Stdout Extraction & Delimited Driver**:
+  - [x] Added `DELIM_START` (`__CLASH_RES_START__`) and `DELIM_END` (`__CLASH_RES_END__`) to drivers across all 4 languages to cleanly separate user debug prints (e.g. `print()`, `cout`) from judge solution output
+  - [x] Implemented `parse_judge_output(raw_stdout, expected_output)`: user debug logs are always preserved in the stdout display frame, and debug prints never cause a correct solution to fail
+  - [x] Resilient IE fallback: if Judge0 returns `verdict == 'IE'` (due to WSL2/Docker container failures), `evaluate_submission` immediately falls back to native local execution
+  - [x] LeetCode index normalization: automatically normalizes both 0-based and 1-based index returns for `two-sum` and `binary-search`
+  - [x] Verified: automated tests in `tests/test_scoring_and_driver.py` pass; stdout from `print("hello world")` verified in console
+- [x] **Granular Scoring Engine (1 Pt Per Passed Test + Difficulty Bonus)**:
+  - [x] Configured `MARKS_PER_TEST_CASE = 1` and `PARTIAL_THRESHOLD = 0.0` in `config.py` & `scoring.py`
+  - [x] Each passed test case awards 1 point (partial scores awarded without threshold blocking)
+  - [x] Complete problem solve bonus: Easy (+2), Medium (+3), Hard (+5) added upon passing 100% of test cases
+  - [x] Leaderboard aggregates best score per problem with tie-breaking based on solve time
+  - [x] Verified: 32/32 tests pass in test suite (`pytest -v`)
+
 
 ### Bhakti's Tracker (`branch: bhakti`)
 - [x] **Clash of Clans Theme Design Tokens**:
