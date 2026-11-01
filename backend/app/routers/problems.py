@@ -13,7 +13,7 @@ the endpoint returns HTTP 423 Locked with a structured body:
 Admin users bypass the lock entirely so they can inspect problems at any time.
 """
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -26,6 +26,8 @@ from app.models import (
     Problem,
     TestCase,
     User,
+    Team,
+    BatchProblem,
     BATCH_STATUS_NOT_STARTED,
 )
 
@@ -104,14 +106,31 @@ def _assert_batch_active(session: Session, user: User) -> None:
 # ---------------------------------------------------------------------------
 @router.get("", response_model=List[ProblemSummary])
 def list_problems(
+    batch_id: Optional[int] = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> List[ProblemSummary]:
     _assert_batch_active(session, current_user)
 
-    problems = session.exec(
-        select(Problem).where(Problem.is_visible == True)  # noqa: E712
-    ).all()
+    target_batch_id = batch_id
+    if current_user.role == "contestant":
+        team = None
+        if current_user.team_id:
+            team = session.get(Team, current_user.team_id)
+        else:
+            team = session.exec(select(Team).where(Team.username == current_user.username)).first()
+        if team and team.batch_id:
+            target_batch_id = team.batch_id
+
+    query = select(Problem).where(Problem.is_visible == True)  # noqa: E712
+    if target_batch_id is not None:
+        assigned_pids = session.exec(
+            select(BatchProblem.problem_id).where(BatchProblem.batch_id == target_batch_id)
+        ).all()
+        if assigned_pids:
+            query = query.where(Problem.id.in_(assigned_pids))
+
+    problems = session.exec(query).all()
     return [
         ProblemSummary(
             id=p.id,
@@ -138,6 +157,22 @@ def get_problem(
     ).first()
     if not prob:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Problem not found")
+
+    if current_user.role == "contestant":
+        team = None
+        if current_user.team_id:
+            team = session.get(Team, current_user.team_id)
+        else:
+            team = session.exec(select(Team).where(Team.username == current_user.username)).first()
+        if team and team.batch_id:
+            assigned_pids = session.exec(
+                select(BatchProblem.problem_id).where(BatchProblem.batch_id == team.batch_id)
+            ).all()
+            if assigned_pids and prob.id not in assigned_pids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="This quest is not allotted to your batch arena.",
+                )
 
     samples = session.exec(
         select(TestCase).where(

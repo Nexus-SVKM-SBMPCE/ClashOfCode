@@ -1,4 +1,4 @@
-"""
+﻿"""
 SQLModel database models and engine configuration.
 Hidden test cases and reference solutions are never serialized to public API responses.
 """
@@ -70,6 +70,17 @@ def _migrate_columns():
             for name, ddl in _USER_COLUMNS.items():
                 if name not in user_cols:
                     conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
+
+        if not inspector.has_table("batch_problems"):
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS batch_problems (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    batch_id INTEGER NOT NULL,
+                    problem_id INTEGER NOT NULL
+                )
+            """))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_batch_problems_batch_id ON batch_problems (batch_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_batch_problems_problem_id ON batch_problems (problem_id)"))
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +162,17 @@ class TestCase(SQLModel, table=True):
 # ---------------------------------------------------------------------------
 # Batch — per-batch contest timer and metadata
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# BatchProblem ? association between batches and allotted questions
+# ---------------------------------------------------------------------------
+class BatchProblem(SQLModel, table=True):
+    __tablename__ = "batch_problems"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    batch_id: int = Field(foreign_key="batches.id", index=True)
+    problem_id: int = Field(foreign_key="problems.id", index=True)
+
+
 class Batch(SQLModel, table=True):
     """Represents a contest batch. Each batch has its own 60-minute countdown.
     status: NOT_STARTED | ACTIVE | COMPLETED

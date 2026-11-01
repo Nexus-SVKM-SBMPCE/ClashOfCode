@@ -22,6 +22,179 @@ const LANGUAGES = [
   { id: 'java',   label: 'Java 13',        ext: 'java' },
 ];
 
+const PROBLEM_STARTERS: Record<string, Record<string, string>> = {
+  'two-sum': {
+    python: `class Solution:
+    def twoSum(self, nums: list[int], target: int) -> list[int]:
+        # Return 1-based indices [i, j]
+        pass
+`,
+    cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+class Solution {
+public:
+    vector<int> twoSum(vector<int>& nums, int target) {
+        // Return 1-based indices {i, j}
+        return {};
+    }
+};
+`,
+    java: `import java.util.*;
+
+class Solution {
+    public int[] twoSum(int[] nums, int target) {
+        // Return 1-based indices [i, j]
+        return new int[]{};
+    }
+}
+`,
+    c: `#include <stdio.h>
+#include <stdlib.h>
+
+int* twoSum(int* nums, int n, int target, int* returnSize) {
+    // Return 1-based indices [i, j]
+    return NULL;
+}
+`,
+  },
+  'fibonacci': {
+    python: `class Solution:
+    def fib(self, n: int) -> int:
+        # Return the n-th Fibonacci number
+        pass
+`,
+    cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+class Solution {
+public:
+    long long fib(int n) {
+        return 0;
+    }
+};
+`,
+    java: `import java.util.*;
+
+class Solution {
+    public long fib(int n) {
+        return 0;
+    }
+}
+`,
+    c: `#include <stdio.h>
+
+long long fib(int n) {
+    return 0;
+}
+`,
+  },
+  'palindrome-check': {
+    python: `class Solution:
+    def isPalindrome(self, s: str) -> bool:
+        # Return True if s is palindrome (ignoring case and non-alphanumeric)
+        pass
+`,
+    cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+class Solution {
+public:
+    bool isPalindrome(string s) {
+        return true;
+    }
+};
+`,
+    java: `import java.util.*;
+
+class Solution {
+    public boolean isPalindrome(String s) {
+        return true;
+    }
+}
+`,
+    c: `#include <stdio.h>
+#include <stdbool.h>
+
+bool isPalindrome(char* s) {
+    return true;
+}
+`,
+  },
+  'binary-search': {
+    python: `class Solution:
+    def search(self, nums: list[int], target: int) -> int:
+        # Return 1-based index of target, or -1
+        pass
+`,
+    cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+class Solution {
+public:
+    int search(vector<int>& nums, int target) {
+        return -1;
+    }
+};
+`,
+    java: `import java.util.*;
+
+class Solution {
+    public int search(int[] nums, int target) {
+        return -1;
+    }
+}
+`,
+    c: `#include <stdio.h>
+
+int search(int* nums, int n, int target) {
+    return -1;
+}
+`,
+  },
+  'max-subarray': {
+    python: `class Solution:
+    def maxSubArray(self, nums: list[int]) -> int:
+        # Return maximum contiguous subarray sum
+        pass
+`,
+    cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+class Solution {
+public:
+    long long maxSubArray(vector<int>& nums) {
+        return 0;
+    }
+};
+`,
+    java: `import java.util.*;
+
+class Solution {
+    public long maxSubArray(int[] nums) {
+        return 0;
+    }
+}
+`,
+    c: `#include <stdio.h>
+
+long long maxSubArray(int* nums, int n) {
+    return 0;
+}
+`,
+  },
+};
+
+const getStarterDrafts = (problemSlug?: string): Record<string, string> => {
+  const specific = problemSlug ? PROBLEM_STARTERS[problemSlug] : undefined;
+  return {
+    python: specific?.python || STARTERS.python,
+    cpp: specific?.cpp || STARTERS.cpp,
+    c: specific?.c || STARTERS.c,
+    java: specific?.java || STARTERS.java,
+  };
+};
+
 const STARTERS: Record<string, string> = {
   python: `# Read input and write output
 import sys
@@ -192,7 +365,7 @@ export default function ProblemPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lang, setLang] = useState('python');
   // Per-language drafts so switching language never throws away work
-  const [drafts, setDrafts] = useState<Record<string, string>>(STARTERS);
+  const [drafts, setDrafts] = useState<Record<string, string>>(() => getStarterDrafts(slug));
   const code = drafts[lang];
   const setCode = (v: string) => setDrafts((d) => ({ ...d, [lang]: v }));
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -218,7 +391,7 @@ export default function ProblemPage() {
     setLastResult(null);
     setRunResult(null);
     setRunning(false);
-    setDrafts(STARTERS);
+    setDrafts(getStarterDrafts(slug));
     getProblem(slug)
       .then((r) => setProblem(r.data))
       .catch((e) => setLoadError(e.response?.status === 404 ? 'Quest not found in the war archives.' : 'Could not load this quest. Is the fortress backend running?'));
@@ -585,14 +758,6 @@ export default function ProblemPage() {
                                 <pre>{tc.actual_output ?? '(no stdout recorded)'}</pre>
                               </div>
 
-                              {tc.stderr ? (
-                                <div className="case-block output-stderr">
-                                  <div className="case-block-label">
-                                    <span>Stderr / Debug Log</span>
-                                  </div>
-                                  <pre>{tc.stderr}</pre>
-                                </div>
-                              ) : null}
                             </div>
                           </>
                         );

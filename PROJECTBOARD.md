@@ -129,6 +129,26 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Implement Admin batch management UI to view/assign teams to batches ($N$ batches of $X$ teams)
   - [x] Add batch filtering to leaderboard: `GET /api/leaderboard?batch_id=X`
   - [x] Verified: 10/10 backend tests in `tests/test_batch_allotment_leaderboard.py` & 2/2 frontend tests in `BatchAllotmentLeaderboard.test.tsx` (build clean, 0 TS errors)
+- [x] **Hidden LeetCode-Style Driver Injection**:
+  - [x] `inject_hidden_driver(source_code, language, problem_slug)` in `judge.py` — auto-wraps `class Solution` style code with stdin-parsing driver for all 5 problems x 4 languages (Python, C++, Java, C)
+  - [x] Passthrough mode: if user code already has `main()` or raw `input()`, driver is NOT injected
+  - [x] `evaluate_local_submission()` — offline fallback using Python `subprocess` (graceful degradation when Judge0 is offline)
+  - [x] `evaluate_submission()` catches `requests.RequestException` and routes to local fallback — zero raw connection errors surfaced to users
+  - [x] Verified: 27/27 backend tests pass; `npm run build` exit 0, 0 TS errors
+- [x] **Clean Run Console (Stderr Removed)**:
+  - [x] Removed `Stderr / Debug Log` block from `ProblemPage.tsx` run result display
+  - [x] Console now shows only: Input, Expected Output, Your Stdout — no debug noise
+  - [x] Backend: `evaluate_sample_submission` always returns `"stderr": ""` for all result entries
+  - [x] Verified: `npm run build` exit 0, 0 TS errors; 27/27 backend tests pass
+- [x] **Batch-Wise Question Allotment (Admin Form)**:
+  - [x] `BatchProblem` SQLModel added to `models.py` (`batch_problems` table: `id, batch_id FK, problem_id FK`); auto-migrated on startup
+  - [x] Admin endpoints in `admin.py`: `GET /api/admin/batches/{id}/problems`, `POST /api/admin/batches/{id}/problems`, `POST /api/admin/batches/allot-problems`
+  - [x] `problems.py` — contestants filtered to only see their batch's allotted problems; non-allotted slugs return HTTP 403
+  - [x] `submissions.py` — Run and Submit both validate batch question allotment, block non-allotted with HTTP 403
+  - [x] Frontend `api.ts` — `BatchProblemAdminInfo` interface + `getBatchProblems`, `setBatchProblems`, `autoAllotBatchProblems` API functions
+  - [x] Admin UI in `LeaderboardPage.tsx` — 'Arena Quest Allotment' section with batch selector, problem checkbox table, Save + Auto-Split buttons
+  - [x] `ProblemPage.tsx` — LeetCode-style `PROBLEM_STARTERS` class skeletons auto-load per problem x language in Monaco editor
+  - [x] Verified: 27/27 backend tests pass; `npm run build` exit 0, 0 TS errors
 
 ### Bhakti's Tracker (`branch: bhakti`)
 - [x] **Clash of Clans Theme Design Tokens**:

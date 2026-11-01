@@ -6,9 +6,12 @@ import {
   assignTeamBatch,
   autoAllotBatches,
   startBatchTimer,
+  getBatchProblems,
+  setBatchProblems,
+  autoAllotBatchProblems,
   demoMode,
 } from '../api';
-import type { LeaderboardEntry, BatchAdminInfo, TeamAdminInfo } from '../api';
+import type { LeaderboardEntry, BatchAdminInfo, TeamAdminInfo, BatchProblemAdminInfo } from '../api';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../Toast';
 import Icon from '../components/Icon';
@@ -30,6 +33,8 @@ export default function LeaderboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [teamsPerBatchInput, setTeamsPerBatchInput] = useState<number>(2);
+  const [selectedConfigBatchId, setSelectedConfigBatchId] = useState<number>(1);
+  const [batchProblems, setBatchProblemsList] = useState<BatchProblemAdminInfo[]>([]);
 
   const refreshLeaderboard = useCallback((batchId?: number) => {
     setRefreshing(true);
@@ -64,6 +69,46 @@ export default function LeaderboardPage() {
       .catch(() => {});
   }, []);
 
+  const loadBatchProblems = useCallback((batchId: number) => {
+    getBatchProblems(batchId)
+      .then((r) => setBatchProblemsList(r.data))
+      .catch(() => {});
+  }, []);
+
+  const handleToggleProblem = (problemId: number) => {
+    setBatchProblemsList((prev) =>
+      prev.map((p) => (p.id === problemId ? { ...p, is_assigned: !p.is_assigned } : p))
+    );
+  };
+
+  const handleSaveBatchQuestions = async () => {
+    setActionLoading(true);
+    try {
+      const selectedIds = batchProblems.filter((p) => p.is_assigned).map((p) => p.id);
+      await setBatchProblems(selectedConfigBatchId, selectedIds);
+      addToast('Batch question allotment saved successfully', 'success');
+      loadBatchProblems(selectedConfigBatchId);
+    } catch {
+      addToast('Failed to save batch question allotment', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAutoSplitQuestions = async () => {
+    setActionLoading(true);
+    try {
+      const res = await autoAllotBatchProblems();
+      addToast(res.data?.message || 'Questions allotted across batches', 'success');
+      loadBatchProblems(selectedConfigBatchId);
+    } catch {
+      addToast('Failed to auto-allot questions', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+
   useEffect(() => {
     loadBatches();
   }, [loadBatches]);
@@ -84,8 +129,9 @@ export default function LeaderboardPage() {
     if (activeTab === 'allotment') {
       loadBatches();
       loadTeams();
+      loadBatchProblems(selectedConfigBatchId);
     }
-  }, [activeTab, loadBatches, loadTeams]);
+  }, [activeTab, loadBatches, loadTeams, loadBatchProblems, selectedConfigBatchId]);
 
   const handleSelectBatch = (batchId?: number) => {
     setSelectedBatchId(batchId);
@@ -436,6 +482,123 @@ export default function LeaderboardPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Arena Quest Allotment (Batch-Wise Questions Admin Form) */}
+            <div className="panel" style={{ marginTop: '24px', padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: 10 }}>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gold-bright)' }}>
+                    ?? Arena Quest Allotment (Batch-Specific Questions)
+                  </h3>
+                  <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>
+                    Allot unique problem sets per batch. Contestants only see questions allotted to their batch arena.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)' }}>Configure Batch:</label>
+                  <select
+                    className="select"
+                    style={{ height: 32, fontSize: '13px' }}
+                    value={selectedConfigBatchId}
+                    onChange={(e) => {
+                      const bid = parseInt(e.target.value);
+                      setSelectedConfigBatchId(bid);
+                      loadBatchProblems(bid);
+                    }}
+                  >
+                    {batches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.status})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Problem Checkboxes Table */}
+              <table className="table" style={{ marginBottom: '16px' }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 50 }}>Allot</th>
+                    <th>Quest Title</th>
+                    <th>Difficulty</th>
+                    <th style={{ width: 140 }}>Slug</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batchProblems.map((p) => {
+                    const diffTone = p.difficulty === 'easy' ? 'var(--ac)' : p.difficulty === 'hard' ? 'var(--wa)' : 'var(--pending)';
+                    return (
+                      <tr
+                        key={p.id}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => handleToggleProblem(p.id)}
+                      >
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={p.is_assigned}
+                            onChange={() => handleToggleProblem(p.id)}
+                            style={{ cursor: 'pointer', width: 16, height: 16, accentColor: 'var(--gold)' }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </td>
+                        <td>
+                          <strong>{p.title}</strong>
+                        </td>
+                        <td>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              padding: '2px 8px',
+                              borderRadius: '10px',
+                              border: `1px solid ${diffTone}`,
+                              color: diffTone,
+                            }}
+                          >
+                            {p.difficulty}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="mono" style={{ fontSize: '12px', color: 'var(--text-3)' }}>{p.slug}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {batchProblems.length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: 'center', padding: '20px' }}>
+                        No questions loaded.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-2)' }}>
+                  Selected Quests: <strong style={{ color: 'var(--gold-bright)' }}>{batchProblems.filter((p) => p.is_assigned).length}</strong> of {batchProblems.length}
+                </span>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={handleSaveBatchQuestions}
+                    disabled={actionLoading}
+                  >
+                    <Icon name="check" size={14} /> Save Quest Allotment
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleAutoSplitQuestions}
+                    disabled={actionLoading}
+                  >
+                    Auto-Split Questions Across Batches
+                  </button>
+                </div>
+              </div>
             </div>
           </>
         )}

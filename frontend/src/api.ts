@@ -353,6 +353,37 @@ export const autoAllotBatches = (teams_per_batch?: number, batch_ids?: number[])
   return api.post('/api/admin/batches/allot', { teams_per_batch, batch_ids });
 };
 
+export interface BatchProblemAdminInfo {
+  id: number;
+  slug: string;
+  title: string;
+  difficulty: string;
+  is_assigned: boolean;
+}
+
+export const getBatchProblems = (batch_id: number) => {
+  if (demoMode.enabled) {
+    return mockResp<BatchProblemAdminInfo[]>([
+      { id: 1, slug: 'two-sum', title: 'Two Sum', difficulty: 'medium', is_assigned: batch_id === 1 },
+      { id: 2, slug: 'fibonacci', title: 'Fibonacci Number', difficulty: 'easy', is_assigned: true },
+      { id: 3, slug: 'palindrome-check', title: 'Palindrome Check', difficulty: 'easy', is_assigned: batch_id === 2 },
+      { id: 4, slug: 'binary-search', title: 'Binary Search', difficulty: 'medium', is_assigned: batch_id === 2 },
+      { id: 5, slug: 'max-subarray', title: 'Maximum Subarray Sum', difficulty: 'hard', is_assigned: batch_id === 1 },
+    ]);
+  }
+  return api.get<BatchProblemAdminInfo[]>(`/api/admin/batches/${batch_id}/problems`);
+};
+
+export const setBatchProblems = (batch_id: number, problem_ids: number[]) => {
+  if (demoMode.enabled) return mockResp({ message: 'Updated', batch_id, problem_ids });
+  return api.post(`/api/admin/batches/${batch_id}/problems`, { problem_ids });
+};
+
+export const autoAllotBatchProblems = (problems_per_batch?: number) => {
+  if (demoMode.enabled) return mockResp({ message: 'Questions allotted', batches: {} });
+  return api.post('/api/admin/batches/allot-problems', { problems_per_batch });
+};
+
 export const startBatchTimer = (batch_id: number) => {
   if (demoMode.enabled) return mockResp({ message: 'Started', batch_id });
   return api.post(`/api/admin/batches/${batch_id}/start-timer`);

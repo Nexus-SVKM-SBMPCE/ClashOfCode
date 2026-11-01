@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 
 from app.auth import require_admin
 from app.database import get_session
-from app.models import Problem, TestCase, User, Team, Batch
+from app.models import Problem, TestCase, User, Team, Batch, BatchProblem
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -348,4 +348,104 @@ def admin_allot_batches(
             }
             for b in batches
         ],
+    }
+class SetBatchProblemsRequest(BaseModel):
+    problem_ids: List[int]
+
+
+class AllotProblemsRequest(BaseModel):
+    problems_per_batch: Optional[int] = None
+
+
+@router.get("/batches/{batch_id}/problems")
+def admin_get_batch_problems(
+    batch_id: int,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> List[Dict[str, Any]]:
+    batch = session.get(Batch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    all_problems = session.exec(select(Problem).order_by(Problem.id)).all()
+    assigned = session.exec(
+        select(BatchProblem.problem_id).where(BatchProblem.batch_id == batch_id)
+    ).all()
+    assigned_set = set(assigned)
+    return [
+        {
+            "id": p.id,
+            "slug": p.slug,
+            "title": p.title,
+            "difficulty": p.difficulty,
+            "is_assigned": p.id in assigned_set,
+        }
+        for p in all_problems
+    ]
+
+
+@router.post("/batches/{batch_id}/problems")
+def admin_set_batch_problems(
+    batch_id: int,
+    body: SetBatchProblemsRequest,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> Dict[str, Any]:
+    batch = session.get(Batch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    existing = session.exec(select(BatchProblem).where(BatchProblem.batch_id == batch_id)).all()
+    for row in existing:
+        session.delete(row)
+
+    for pid in body.problem_ids:
+        prob = session.get(Problem, pid)
+        if prob:
+            session.add(BatchProblem(batch_id=batch_id, problem_id=pid))
+
+    session.commit()
+    return {
+        "message": f"Successfully updated questions for {batch.name}",
+        "batch_id": batch_id,
+        "problem_ids": body.problem_ids,
+    }
+
+
+@router.post("/batches/allot-problems")
+def admin_auto_allot_problems(
+    body: Optional[AllotProblemsRequest] = None,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> Dict[str, Any]:
+    batches = session.exec(select(Batch).order_by(Batch.batch_number)).all()
+    if not batches:
+        raise HTTPException(status_code=400, detail="No batches available")
+    problems = session.exec(select(Problem).where(Problem.is_visible == True).order_by(Problem.id)).all()
+    if not problems:
+        raise HTTPException(status_code=400, detail="No problems available")
+
+    all_existing = session.exec(select(BatchProblem)).all()
+    for row in all_existing:
+        session.delete(row)
+
+    per_batch = body.problems_per_batch if body and body.problems_per_batch else 0
+    summary: Dict[str, List[str]] = {}
+
+    if per_batch > 0:
+        for idx, b in enumerate(batches):
+            start_idx = (idx * per_batch) % len(problems)
+            batch_probs = [problems[(start_idx + i) % len(problems)] for i in range(min(per_batch, len(problems)))]
+            for p in batch_probs:
+                session.add(BatchProblem(batch_id=b.id, problem_id=p.id))  # type: ignore[arg-type]
+            summary[b.name] = [p.title for p in batch_probs]
+    else:
+        for idx, p in enumerate(problems):
+            target_batch = batches[idx % len(batches)]
+            session.add(BatchProblem(batch_id=target_batch.id, problem_id=p.id))  # type: ignore[arg-type]
+            summary.setdefault(target_batch.name, []).append(p.title)
+
+    session.commit()
+    return {
+        "message": "Questions successfully allotted across batches",
+        "batches": summary,
     }
