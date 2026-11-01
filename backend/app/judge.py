@@ -3,11 +3,12 @@ Judge0 client — base64-encoded, resilient evaluation with LeetCode-style
 hidden driver injection and offline local fallback execution engine.
 """
 import base64
+import os
 import subprocess
 import sys
 import time
 import requests
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from app.config import JUDGE0_URL, JUDGE0_LANGUAGE_IDS
 
 # Judge0 status ID constants
@@ -35,6 +36,9 @@ VERDICT_MAP = {
     14: "IE",
 }
 
+DELIM_START = "__CLASH_RES_START__"
+DELIM_END   = "__CLASH_RES_END__"
+
 
 def _b64(s: Optional[str]) -> Optional[str]:
     if s is None:
@@ -51,11 +55,48 @@ def _unb64(s: Optional[str]) -> str:
         return str(s)
 
 
+def parse_judge_output(raw_stdout: str, expected_output: str) -> Tuple[str, str]:
+    """
+    Parses execution output.
+    If the code was wrapped with a LeetCode driver (DELIM_START ... DELIM_END),
+    it isolates user debug prints (e.g. print(...) or cout << ...) from the return value.
+    This guarantees that debug logs are preserved in the stdout console and do NOT
+    cause an otherwise correct solution to fail with WA!
+    """
+    clean_exp = (expected_output or "").strip().replace("\r\n", "\n")
+    if not raw_stdout:
+        return ("WA" if clean_exp else "AC", "")
+
+    if DELIM_START in raw_stdout and DELIM_END in raw_stdout:
+        start_idx = raw_stdout.find(DELIM_START)
+        end_idx = raw_stdout.find(DELIM_END)
+        user_stdout = (raw_stdout[:start_idx] + raw_stdout[end_idx + len(DELIM_END):]).strip()
+        result_str = raw_stdout[start_idx + len(DELIM_START):end_idx].strip()
+
+        if result_str:
+            clean_res = result_str.strip().replace("\r\n", "\n")
+            verdict = "AC" if clean_res == clean_exp else "WA"
+            if user_stdout:
+                display_stdout = f"{user_stdout}\n{result_str}"
+            else:
+                display_stdout = result_str
+        else:
+            verdict = "WA"
+            display_stdout = user_stdout if user_stdout else ""
+
+        return verdict, display_stdout
+
+    # Standard direct stdout (competitive programming mode without class Solution)
+    clean_out = raw_stdout.strip().replace("\r\n", "\n")
+    verdict = "AC" if clean_out == clean_exp else "WA"
+    return verdict, raw_stdout
+
+
 def inject_hidden_driver(source_code: str, language: str, problem_slug: Optional[str] = None) -> str:
     """
     Injects a LeetCode-like hidden driver at the end of user source code.
     If the user has written custom solution classes/functions, the driver reads
-    stdin, executes the solution, and writes formatted output to stdout.
+    stdin, executes the solution, and writes delimited formatted output.
     If the user already wrote standard I/O (e.g. main() or raw input()), the driver
     safely yields to the user's entry point.
     """
@@ -83,12 +124,12 @@ def __clash_hidden_driver__():
 
     sol = Solution() if 'Solution' in globals() else None
 
+    ans = None
     if "{slug}" == "two-sum":
         parts = lines[0].split()
         n = int(parts[0])
         target = int(parts[1])
         nums = list(map(int, lines[1].split()))
-        ans = None
         if sol and hasattr(sol, "twoSum"):
             ans = sol.twoSum(nums, target)
         elif sol and hasattr(sol, "two_sum"):
@@ -99,15 +140,21 @@ def __clash_hidden_driver__():
             ans = two_sum(nums, target)
         elif 'solve' in globals():
             ans = solve(nums, target)
-        if ans is not None:
-            if isinstance(ans, (list, tuple)):
-                print(f"{{ans[0]}} {{ans[1]}}")
+
+        if ans is not None and isinstance(ans, (list, tuple)) and len(ans) >= 2:
+            i, j = ans[0], ans[1]
+            if 0 <= i < n and 0 <= j < n and i != j and nums[i] + nums[j] == target:
+                formatted = f"{{min(i, j) + 1}} {{max(i, j) + 1}}"
+            elif 1 <= i <= n and 1 <= j <= n and i != j and nums[i-1] + nums[j-1] == target:
+                formatted = f"{{min(i, j)}} {{max(i, j)}}"
             else:
-                print(ans)
+                formatted = f"{{i}} {{j}}"
+            print(f"{DELIM_START}{{formatted}}{DELIM_END}")
+        elif ans is not None:
+            print(f"{DELIM_START}{{ans}}{DELIM_END}")
 
     elif "{slug}" == "fibonacci":
         n = int(lines[0])
-        ans = None
         if sol and hasattr(sol, "fib"):
             ans = sol.fib(n)
         elif sol and hasattr(sol, "fibonacci"):
@@ -119,11 +166,10 @@ def __clash_hidden_driver__():
         elif 'solve' in globals():
             ans = solve(n)
         if ans is not None:
-            print(ans)
+            print(f"{DELIM_START}{{ans}}{DELIM_END}")
 
     elif "{slug}" == "palindrome-check":
         s = lines[0]
-        ans = None
         if sol and hasattr(sol, "isPalindrome"):
             ans = sol.isPalindrome(s)
         elif sol and hasattr(sol, "is_palindrome"):
@@ -136,16 +182,16 @@ def __clash_hidden_driver__():
             ans = solve(s)
         if ans is not None:
             if isinstance(ans, bool):
-                print("YES" if ans else "NO")
+                res_str = "YES" if ans else "NO"
             else:
-                print(str(ans).strip())
+                res_str = str(ans).strip()
+            print(f"{DELIM_START}{{res_str}}{DELIM_END}")
 
     elif "{slug}" == "binary-search":
         parts = lines[0].split()
         n = int(parts[0])
         target = int(parts[1])
         nums = list(map(int, lines[1].split()))
-        ans = None
         if sol and hasattr(sol, "search"):
             ans = sol.search(nums, target)
         elif sol and hasattr(sol, "binarySearch"):
@@ -155,12 +201,22 @@ def __clash_hidden_driver__():
         elif 'solve' in globals():
             ans = solve(nums, target)
         if ans is not None:
-            print(ans)
+            if isinstance(ans, int):
+                if ans == -1:
+                    formatted = "-1"
+                elif 0 <= ans < n and nums[ans] == target:
+                    formatted = str(ans + 1)
+                elif 1 <= ans <= n and nums[ans - 1] == target:
+                    formatted = str(ans)
+                else:
+                    formatted = str(ans)
+            else:
+                formatted = str(ans)
+            print(f"{DELIM_START}{{formatted}}{DELIM_END}")
 
     elif "{slug}" == "max-subarray":
         n = int(lines[0])
         nums = list(map(int, lines[1].split()))
-        ans = None
         if sol and hasattr(sol, "maxSubArray"):
             ans = sol.maxSubArray(nums)
         elif sol and hasattr(sol, "max_sub_array"):
@@ -170,7 +226,7 @@ def __clash_hidden_driver__():
         elif 'solve' in globals():
             ans = solve(nums)
         if ans is not None:
-            print(ans)
+            print(f"{DELIM_START}{{ans}}{DELIM_END}")
 
 if __name__ == '__main__':
     __clash_hidden_driver__()
@@ -182,69 +238,80 @@ if __name__ == '__main__':
             return source_code
 
         if slug == "two-sum":
-            driver = '''
-int main() {
+            driver = f'''
+int main() {{
     ios_base::sync_with_stdio(false);
     cin.tie(NULL);
     int n, target;
-    if (cin >> n >> target) {
+    if (cin >> n >> target) {{
         vector<int> nums(n);
         for (int i = 0; i < n; ++i) cin >> nums[i];
         Solution sol;
         vector<int> ans = sol.twoSum(nums, target);
-        if (ans.size() >= 2) cout << ans[0] << " " << ans[1] << "\\n";
-    }
+        if (ans.size() >= 2) {{
+            int i = ans[0], j = ans[1];
+            if (i >= 0 && i < n && j >= 0 && j < n && i != j && nums[i] + nums[j] == target) {{
+                cout << "{DELIM_START}" << (min(i, j) + 1) << " " << (max(i, j) + 1) << "{DELIM_END}\\n";
+            }} else {{
+                cout << "{DELIM_START}" << i << " " << j << "{DELIM_END}\\n";
+            }}
+        }}
+    }}
     return 0;
-}
+}}
 '''
         elif slug == "fibonacci":
-            driver = '''
-int main() {
+            driver = f'''
+int main() {{
     int n;
-    if (cin >> n) {
+    if (cin >> n) {{
         Solution sol;
-        cout << sol.fib(n) << "\\n";
-    }
+        cout << "{DELIM_START}" << sol.fib(n) << "{DELIM_END}\\n";
+    }}
     return 0;
-}
+}}
 '''
         elif slug == "palindrome-check":
-            driver = '''
-int main() {
+            driver = f'''
+int main() {{
     string s;
-    if (getline(cin, s)) {
+    if (getline(cin, s)) {{
         Solution sol;
         bool ans = sol.isPalindrome(s);
-        cout << (ans ? "YES" : "NO") << "\\n";
-    }
+        cout << "{DELIM_START}" << (ans ? "YES" : "NO") << "{DELIM_END}\\n";
+    }}
     return 0;
-}
+}}
 '''
         elif slug == "binary-search":
-            driver = '''
-int main() {
+            driver = f'''
+int main() {{
     int n, target;
-    if (cin >> n >> target) {
+    if (cin >> n >> target) {{
         vector<int> nums(n);
         for (int i = 0; i < n; ++i) cin >> nums[i];
         Solution sol;
-        cout << sol.search(nums, target) << "\\n";
-    }
+        int ans = sol.search(nums, target);
+        if (ans >= 0 && ans < n && nums[ans] == target) {{
+            ans = ans + 1;
+        }}
+        cout << "{DELIM_START}" << ans << "{DELIM_END}\\n";
+    }}
     return 0;
-}
+}}
 '''
         elif slug == "max-subarray":
-            driver = '''
-int main() {
+            driver = f'''
+int main() {{
     int n;
-    if (cin >> n) {
+    if (cin >> n) {{
         vector<int> nums(n);
         for (int i = 0; i < n; ++i) cin >> nums[i];
         Solution sol;
-        cout << sol.maxSubArray(nums) << "\\n";
-    }
+        cout << "{DELIM_START}" << sol.maxSubArray(nums) << "{DELIM_END}\\n";
+    }}
     return 0;
-}
+}}
 '''
         else:
             driver = ""
@@ -255,79 +322,90 @@ int main() {
             return source_code
 
         if slug == "two-sum":
-            driver = '''
-public class Main {
-    public static void main(String[] args) {
+            driver = f'''
+public class Main {{
+    public static void main(String[] args) {{
         Scanner sc = new Scanner(System.in);
-        if (sc.hasNextInt()) {
+        if (sc.hasNextInt()) {{
             int n = sc.nextInt();
             int target = sc.nextInt();
             int[] nums = new int[n];
             for (int i = 0; i < n; ++i) nums[i] = sc.nextInt();
             Solution sol = new Solution();
             int[] ans = sol.twoSum(nums, target);
-            if (ans != null && ans.length >= 2) System.out.println(ans[0] + " " + ans[1]);
-        }
-    }
-}
+            if (ans != null && ans.length >= 2) {{
+                int i = ans[0], j = ans[1];
+                if (i >= 0 && i < n && j >= 0 && j < n && i != j && nums[i] + nums[j] == target) {{
+                    System.out.println("{DELIM_START}" + (Math.min(i, j) + 1) + " " + (Math.max(i, j) + 1) + "{DELIM_END}");
+                }} else {{
+                    System.out.println("{DELIM_START}" + i + " " + j + "{DELIM_END}");
+                }}
+            }}
+        }}
+    }}
+}}
 '''
         elif slug == "fibonacci":
-            driver = '''
-public class Main {
-    public static void main(String[] args) {
+            driver = f'''
+public class Main {{
+    public static void main(String[] args) {{
         Scanner sc = new Scanner(System.in);
-        if (sc.hasNextInt()) {
+        if (sc.hasNextInt()) {{
             int n = sc.nextInt();
             Solution sol = new Solution();
-            System.out.println(sol.fib(n));
-        }
-    }
-}
+            System.out.println("{DELIM_START}" + sol.fib(n) + "{DELIM_END}");
+        }}
+    }}
+}}
 '''
         elif slug == "palindrome-check":
-            driver = '''
-public class Main {
-    public static void main(String[] args) {
+            driver = f'''
+public class Main {{
+    public static void main(String[] args) {{
         Scanner sc = new Scanner(System.in);
-        if (sc.hasNextLine()) {
+        if (sc.hasNextLine()) {{
             String s = sc.nextLine();
             Solution sol = new Solution();
             boolean ans = sol.isPalindrome(s);
-            System.out.println(ans ? "YES" : "NO");
-        }
-    }
-}
+            System.out.println("{DELIM_START}" + (ans ? "YES" : "NO") + "{DELIM_END}");
+        }}
+    }}
+}}
 '''
         elif slug == "binary-search":
-            driver = '''
-public class Main {
-    public static void main(String[] args) {
+            driver = f'''
+public class Main {{
+    public static void main(String[] args) {{
         Scanner sc = new Scanner(System.in);
-        if (sc.hasNextInt()) {
+        if (sc.hasNextInt()) {{
             int n = sc.nextInt();
             int target = sc.nextInt();
             int[] nums = new int[n];
             for (int i = 0; i < n; ++i) nums[i] = sc.nextInt();
             Solution sol = new Solution();
-            System.out.println(sol.search(nums, target));
-        }
-    }
-}
+            int ans = sol.search(nums, target);
+            if (ans >= 0 && ans < n && nums[ans] == target) {{
+                ans = ans + 1;
+            }}
+            System.out.println("{DELIM_START}" + ans + "{DELIM_END}");
+        }}
+    }}
+}}
 '''
         elif slug == "max-subarray":
-            driver = '''
-public class Main {
-    public static void main(String[] args) {
+            driver = f'''
+public class Main {{
+    public static void main(String[] args) {{
         Scanner sc = new Scanner(System.in);
-        if (sc.hasNextInt()) {
+        if (sc.hasNextInt()) {{
             int n = sc.nextInt();
             int[] nums = new int[n];
             for (int i = 0; i < n; ++i) nums[i] = sc.nextInt();
             Solution sol = new Solution();
-            System.out.println(sol.maxSubArray(nums));
-        }
-    }
-}
+            System.out.println("{DELIM_START}" + sol.maxSubArray(nums) + "{DELIM_END}");
+        }}
+    }}
+}}
 '''
         else:
             driver = ""
@@ -338,66 +416,78 @@ public class Main {
             return source_code
 
         if slug == "two-sum":
-            driver = '''
-int main() {
+            driver = f'''
+int main() {{
     int n, target;
-    if (scanf("%d %d", &n, &target) == 2) {
+    if (scanf("%d %d", &n, &target) == 2) {{
         int* nums = (int*)malloc(n * sizeof(int));
         for (int i = 0; i < n; ++i) scanf("%d", &nums[i]);
         int retSize = 0;
         int* ans = twoSum(nums, n, target, &retSize);
-        if (ans && retSize >= 2) printf("%d %d\\n", ans[0], ans[1]);
+        if (ans && retSize >= 2) {{
+            int i = ans[0], j = ans[1];
+            if (i >= 0 && i < n && j >= 0 && j < n && i != j && nums[i] + nums[j] == target) {{
+                printf("{DELIM_START}%d %d{DELIM_END}\\n", (i < j ? i : j) + 1, (i > j ? i : j) + 1);
+            }} else {{
+                printf("{DELIM_START}%d %d{DELIM_END}\\n", i, j);
+            }}
+        }}
         free(nums);
-    }
+    }}
     return 0;
-}
+}}
 '''
         elif slug == "fibonacci":
-            driver = '''
-int main() {
+            driver = f'''
+int main() {{
     int n;
-    if (scanf("%d", &n) == 1) printf("%lld\\n", (long long)fib(n));
+    if (scanf("%d", &n) == 1) printf("{DELIM_START}%lld{DELIM_END}\\n", (long long)fib(n));
     return 0;
-}
+}}
 '''
         elif slug == "palindrome-check":
-            driver = '''
-int main() {
+            driver = f'''
+int main() {{
     char s[100005];
-    if (fgets(s, sizeof(s), stdin)) {
+    if (fgets(s, sizeof(s), stdin)) {{
         int len = strlen(s);
         if (len > 0 && s[len-1] == '\\n') s[len-1] = '\\0';
         int ans = isPalindrome(s);
-        printf("%s\\n", ans ? "YES" : "NO");
-    }
+        printf("{DELIM_START}%s{DELIM_END}\\n", ans ? "YES" : "NO");
+    }}
     return 0;
-}
+}}
 '''
         elif slug == "binary-search":
-            driver = '''
-int main() {
+            driver = f'''
+int main() {{
     int n, target;
-    if (scanf("%d %d", &n, &target) == 2) {
+    if (scanf("%d %d", &n, &target) == 2) {{
         int* nums = (int*)malloc(n * sizeof(int));
         for (int i = 0; i < n; ++i) scanf("%d", &nums[i]);
-        printf("%d\\n", search(nums, n, target));
+        int ans = search(nums, n, target);
+        if (ans >= 0 && ans < n && nums[ans] == target) {{
+            ans = ans + 1;
+        }}
+        printf("{DELIM_START}%d{DELIM_END}\\n", ans);
         free(nums);
-    }
+    }}
     return 0;
-}
+}}
 '''
         elif slug == "max-subarray":
-            driver = '''
-int main() {
+            driver = f'''
+int main() {{
     int n;
-    if (scanf("%d", &n) == 1) {
+    if (scanf("%d", &n) == 1) {{
         int* nums = (int*)malloc(n * sizeof(int));
         for (int i = 0; i < n; ++i) scanf("%d", &nums[i]);
-        printf("%lld\\n", (long long)maxSubArray(nums, n));
+        int ans = maxSubArray(nums, n);
+        printf("{DELIM_START}%d{DELIM_END}\\n", ans);
         free(nums);
-    }
+    }}
     return 0;
-}
+}}
 '''
         else:
             driver = ""
@@ -415,7 +505,8 @@ def evaluate_local_submission(
     memory_limit: int = 262144,
 ) -> dict:
     """
-    Offline local execution engine for Python submissions when Judge0 is not running.
+    Offline local execution engine for Python submissions when Judge0 is not running
+    or encounters container/cgroup failures.
     Executes code via native subprocess with timeout safeguards and accurate verdicts.
     """
     start_time = time.time()
@@ -445,15 +536,12 @@ def evaluate_local_submission(
                     "memory_kb": None,
                 }
 
-            # Check verdict against expected output
-            clean_out = stdout.strip().replace("\r\n", "\n")
-            clean_exp = expected_output.strip().replace("\r\n", "\n")
-            verdict = "AC" if clean_out == clean_exp else "WA"
+            verdict, parsed_stdout = parse_judge_output(stdout, expected_output)
 
             return {
                 "status_id": STATUS_ACCEPTED if verdict == "AC" else STATUS_WRONG_ANSWER,
                 "verdict": verdict,
-                "stdout": stdout,
+                "stdout": parsed_stdout,
                 "stderr": "",
                 "compile_error": None,
                 "runtime_ms": elapsed_ms,
@@ -481,7 +569,7 @@ def evaluate_local_submission(
                 "memory_kb": None,
             }
 
-    # For compiled languages when Judge0 container is offline
+    # For other languages when Judge0 container is offline
     return {
         "status_id": STATUS_IE,
         "verdict": "IE",
@@ -504,7 +592,8 @@ def evaluate_submission(
 ) -> dict:
     """
     Submit to Judge0 and wait for result.
-    If Judge0 is unavailable (offline LAN without Docker), gracefully falls back to local runner.
+    If Judge0 is unavailable (offline LAN without Docker), or returns an Internal Error (IE)
+    due to container/cgroup failures, gracefully falls back to the native local runner.
     """
     final_code = inject_hidden_driver(source_code, language, problem_slug)
 
@@ -538,8 +627,8 @@ def evaluate_submission(
         )
         r.raise_for_status()
         res = r.json()
-    except requests.RequestException:
-        # Fall back gracefully to local engine — never surface raw HTTP connection errors
+    except Exception:
+        # Fall back gracefully to local engine on connection error, timeout, or 5xx
         return evaluate_local_submission(
             source_code=final_code,
             language=language,
@@ -575,6 +664,24 @@ def evaluate_submission(
     runtime_ms: Optional[float] = float(time_val) * 1000 if time_val else None
     memory_kb:  Optional[int]   = int(memory_val) if memory_val else None
     verdict = VERDICT_MAP.get(status_id, "IE")
+
+    # If Judge0 returned IE (container/isolate/cgroup error), fall back to local runner
+    if verdict == "IE":
+        return evaluate_local_submission(
+            source_code=final_code,
+            language=language,
+            stdin=stdin,
+            expected_output=expected_output,
+            cpu_time_limit=cpu_time_limit,
+            memory_limit=memory_limit,
+        )
+
+    # Parse stdout to separate user prints from driver delimiters
+    if stdout:
+        calc_verdict, parsed_stdout = parse_judge_output(stdout, expected_output)
+        if verdict in ("AC", "WA"):
+            verdict = calc_verdict
+        stdout = parsed_stdout
 
     return {
         "status_id":    status_id,

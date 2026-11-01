@@ -149,6 +149,19 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Admin UI in `LeaderboardPage.tsx` — 'Arena Quest Allotment' section with batch selector, problem checkbox table, Save + Auto-Split buttons
   - [x] `ProblemPage.tsx` — LeetCode-style `PROBLEM_STARTERS` class skeletons auto-load per problem x language in Monaco editor
   - [x] Verified: 27/27 backend tests pass; `npm run build` exit 0, 0 TS errors
+- [x] **LeetCode-Style Stdout Extraction & Delimited Driver**:
+  - [x] Added `DELIM_START` (`__CLASH_RES_START__`) and `DELIM_END` (`__CLASH_RES_END__`) to drivers across all 4 languages to cleanly separate user debug prints (e.g. `print()`, `cout`) from judge solution output
+  - [x] Implemented `parse_judge_output(raw_stdout, expected_output)`: user debug logs are always preserved in the stdout display frame, and debug prints never cause a correct solution to fail
+  - [x] Resilient IE fallback: if Judge0 returns `verdict == 'IE'` (due to WSL2/Docker container failures), `evaluate_submission` immediately falls back to native local execution
+  - [x] LeetCode index normalization: automatically normalizes both 0-based and 1-based index returns for `two-sum` and `binary-search`
+  - [x] Verified: automated tests in `tests/test_scoring_and_driver.py` pass; stdout from `print("hello world")` verified in console
+- [x] **Granular Scoring Engine (1 Pt Per Passed Test + Difficulty Bonus)**:
+  - [x] Configured `MARKS_PER_TEST_CASE = 1` and `PARTIAL_THRESHOLD = 0.0` in `config.py` & `scoring.py`
+  - [x] Each passed test case awards 1 point (partial scores awarded without threshold blocking)
+  - [x] Complete problem solve bonus: Easy (+2), Medium (+3), Hard (+5) added upon passing 100% of test cases
+  - [x] Leaderboard aggregates best score per problem with tie-breaking based on solve time
+  - [x] Verified: 32/32 tests pass in test suite (`pytest -v`)
+
 
 ### Bhakti's Tracker (`branch: bhakti`)
 - [x] **Clash of Clans Theme Design Tokens**:

@@ -36,6 +36,6 @@ DEFAULT_MEMORY_LIMIT: int = 262144         # KB = 256 MB (safe for Java, C, C++,
 DEFAULT_MAX_PROCESSES: int = 60
 
 # Granular scoring (see app/scoring.py)
-MARKS_PER_TEST_CASE: int = int(os.getenv("MARKS_PER_TEST_CASE", "10"))
-PARTIAL_THRESHOLD: float = float(os.getenv("PARTIAL_THRESHOLD", "0.5"))  # min fraction of tests passed
+MARKS_PER_TEST_CASE: int = int(os.getenv("MARKS_PER_TEST_CASE", "1"))
+PARTIAL_THRESHOLD: float = float(os.getenv("PARTIAL_THRESHOLD", "0.0"))  # min fraction of tests passed
 DIFFICULTY_BONUS = {"easy": 2, "medium": 3, "hard": 5}
