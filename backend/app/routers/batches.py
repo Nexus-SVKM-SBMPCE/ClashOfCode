@@ -27,6 +27,7 @@ from app.database import get_session
 from app.models import (
     Batch,
     User,
+    Team,
     BATCH_STATUS_NOT_STARTED,
     BATCH_STATUS_ACTIVE,
     BATCH_STATUS_COMPLETED,
@@ -100,7 +101,7 @@ def _batch_to_timer_response(batch: Batch, now: datetime) -> BatchTimerResponse:
 @router.get("/api/batches/my-batch/timer", response_model=BatchTimerResponse)
 def get_my_batch_timer(
     session: Session = Depends(get_session),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> BatchTimerResponse:
     """
     Return the live countdown data for the contestant's batch.
@@ -108,12 +109,24 @@ def get_my_batch_timer(
     the client MUST use it — never the browser's local clock.
     """
     now = _utc_now()
-    # Phase 1: return the first ACTIVE batch, or the first batch at all as fallback
-    batch = session.exec(
-        select(Batch).where(Batch.status == BATCH_STATUS_ACTIVE)
-    ).first()
+    batch = None
+
+    # Check if contestant is part of a team with an assigned batch
+    team = None
+    if current_user.team_id:
+        team = session.get(Team, current_user.team_id)
+    elif current_user.role == "contestant":
+        team = session.exec(select(Team).where(Team.username == current_user.username)).first()
+
+    if team and team.batch_id:
+        batch = session.get(Batch, team.batch_id)
+
+    # Fallback to active batch, or earliest batch if no team/batch allotment
     if batch is None:
-        # Fall back to the earliest batch regardless of status (pre-start state)
+        batch = session.exec(
+            select(Batch).where(Batch.status == BATCH_STATUS_ACTIVE)
+        ).first()
+    if batch is None:
         batch = session.exec(select(Batch).order_by(Batch.batch_number)).first()  # type: ignore[arg-type]
     if batch is None:
         raise HTTPException(

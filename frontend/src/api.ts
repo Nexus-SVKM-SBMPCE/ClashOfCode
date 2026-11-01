@@ -75,6 +75,12 @@ export interface User {
   username: string;
   display_name: string;
   role: 'admin' | 'contestant';
+  team_id?: number | null;
+  team_name?: string | null;
+  batch_id?: number | null;
+  leader_name?: string | null;
+  leader_email?: string | null;
+  members_info?: string | null;
 }
 
 export interface Problem {

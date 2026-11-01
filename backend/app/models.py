@@ -49,15 +49,48 @@ _SUBMISSION_COLUMNS = {
     "batch_id": "INTEGER DEFAULT NULL",
 }
 
+_USER_COLUMNS = {
+    "team_id": "INTEGER DEFAULT NULL",
+}
+
 
 def _migrate_columns():
     from sqlalchemy import inspect, text
-    existing = {c["name"] for c in inspect(engine).get_columns("submissions")}
     with engine.begin() as conn:
-        for name, ddl in _SUBMISSION_COLUMNS.items():
-            if name not in existing:
-                conn.execute(text(f"ALTER TABLE submissions ADD COLUMN {name} {ddl}"))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_submissions_created_at ON submissions (created_at)"))
+        inspector = inspect(engine)
+        if inspector.has_table("submissions"):
+            sub_cols = {c["name"] for c in inspector.get_columns("submissions")}
+            for name, ddl in _SUBMISSION_COLUMNS.items():
+                if name not in sub_cols:
+                    conn.execute(text(f"ALTER TABLE submissions ADD COLUMN {name} {ddl}"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_submissions_created_at ON submissions (created_at)"))
+
+        if inspector.has_table("users"):
+            user_cols = {c["name"] for c in inspector.get_columns("users")}
+            for name, ddl in _USER_COLUMNS.items():
+                if name not in user_cols:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
+
+
+# ---------------------------------------------------------------------------
+# Team — Single shared login per team (username + password)
+# ---------------------------------------------------------------------------
+class Team(SQLModel, table=True):
+    __tablename__ = "teams"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(max_length=100)                             # Team name, e.g. "Code Clan"
+    username: str = Field(index=True, unique=True, max_length=50) # Shared login username, e.g. "team1"
+    hashed_password: str                                          # Bcrypt hash of team password
+    leader_name: str = Field(max_length=100)                      # Team leader name
+    leader_email: str = Field(max_length=150)                     # Team leader email
+    members_info: Optional[str] = Field(default=None)             # JSON string of members info
+    batch_id: Optional[int] = Field(default=None, foreign_key="batches.id", index=True)
+    total_score: int = Field(default=0)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    batch: Optional["Batch"] = Relationship()
+    users: List["User"] = Relationship(back_populates="team")
 
 
 # ---------------------------------------------------------------------------
@@ -72,9 +105,11 @@ class User(SQLModel, table=True):
     display_name: str = Field(max_length=100)
     role: str = Field(default="contestant")   # "admin" | "contestant"
     is_active: bool = Field(default=True)
+    team_id: Optional[int] = Field(default=None, foreign_key="teams.id", index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     submissions: List["Submission"] = Relationship(back_populates="user")
+    team: Optional[Team] = Relationship(back_populates="users")
 
 
 # ---------------------------------------------------------------------------

@@ -118,10 +118,12 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Hide Leaderboard ("War Ranks") link from navbar for contestants
   - [x] Restrict `/leaderboard` route via `RequireAdmin` guard redirecting unprivileged attempts to `/problems`
   - [x] Verified: 5/5 backend tests in `tests/test_rbac_leaderboard.py` & 4/4 frontend tests in `frontend/src/RbacLeaderboard.test.tsx` (build clean, 0 TS errors)
-- [ ] **Team Database & Single Team Shared Login**:
-  - [ ] Create `Team` model (`id`, `name`, `username`, `hashed_password`, `leader_name`, `leader_email`, `batch_id`, `total_score`)
-  - [ ] Migrate authentication so teams log in using their shared Team credentials
-  - [ ] Update seed data with sample teams across batches
+- [x] **Team Database & Single Team Shared Login**:
+  - [x] Create `Team` model (`id`, `name`, `username`, `hashed_password`, `leader_name`, `leader_email`, `members_info`, `batch_id`, `total_score`, `created_at`)
+  - [x] Migrate `/api/auth/login` to authenticate teams by shared credentials, issue team JWTs, and sync User records
+  - [x] Integrate `/api/auth/me` and `/api/batches/my-batch/timer` to resolve team batch assignment
+  - [x] Seed sample teams across Batch 1 and Batch 2 (`team1`–`team5`)
+  - [x] Verified: 7/7 backend tests in `tests/test_team_auth.py` (build clean, 0 TS errors)
 - [ ] **Batch-Wise Allotment & Batch Leaderboards**:
   - [ ] Create `Batch` model (`id`, `batch_number`, `name`, `status`, `timer_started_at`, `duration_minutes`)
   - [ ] Implement Admin batch management UI to view/assign teams to batches ($N$ batches of $X$ teams)

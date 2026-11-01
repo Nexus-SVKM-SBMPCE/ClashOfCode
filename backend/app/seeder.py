@@ -3,7 +3,7 @@ Database seeder: demo accounts, sample DSA problems, and hidden test cases.
 Safe to run multiple times (idempotent).
 """
 from sqlmodel import Session, select
-from app.models import User, Problem, TestCase, Batch, BATCH_STATUS_NOT_STARTED
+from app.models import User, Problem, TestCase, Batch, Team, BATCH_STATUS_NOT_STARTED
 from app.auth import hash_password
 
 
@@ -271,16 +271,110 @@ def seed(session: Session) -> None:
     session.commit()
 
     # -----------------------------------------------------------------------
-    # Seed default Batch 1 (NOT_STARTED — admin triggers it during the event)
+    # Seed Batches 1 & 2 (NOT_STARTED)
     # -----------------------------------------------------------------------
-    existing_batch = session.exec(
-        select(Batch).where(Batch.batch_number == 1)
-    ).first()
-    if not existing_batch:
-        session.add(Batch(
-            batch_number=1,
-            name="Batch 1",
-            duration_minutes=60,
-            status=BATCH_STATUS_NOT_STARTED,
-        ))
-        session.commit()
+    batches = {}
+    for b_num, b_name in [(1, "Batch 1"), (2, "Batch 2")]:
+        b = session.exec(select(Batch).where(Batch.batch_number == b_num)).first()
+        if not b:
+            b = Batch(
+                batch_number=b_num,
+                name=b_name,
+                duration_minutes=60,
+                status=BATCH_STATUS_NOT_STARTED,
+            )
+            session.add(b)
+            session.commit()
+            session.refresh(b)
+        batches[b_num] = b
+
+    # -----------------------------------------------------------------------
+    # Seed Sample Teams across Batches
+    # -----------------------------------------------------------------------
+    SAMPLE_TEAMS = [
+        {
+            "name": "Code Clan",
+            "username": "team1",
+            "password": "team123",
+            "leader_name": "Alice Chen",
+            "leader_email": "alice@clash.local",
+            "members_info": '[{"name": "Alice Chen", "role": "Leader"}, {"name": "Charlie Day", "role": "Member"}]',
+            "batch_number": 1,
+        },
+        {
+            "name": "Byte Brawlers",
+            "username": "team2",
+            "password": "team123",
+            "leader_name": "Bob Patel",
+            "leader_email": "bob@clash.local",
+            "members_info": '[{"name": "Bob Patel", "role": "Leader"}, {"name": "David Miller", "role": "Member"}]',
+            "batch_number": 1,
+        },
+        {
+            "name": "Algo Assassins",
+            "username": "team3",
+            "password": "team123",
+            "leader_name": "Chloe Sharma",
+            "leader_email": "chloe@clash.local",
+            "members_info": '[{"name": "Chloe Sharma", "role": "Leader"}, {"name": "Emma Watson", "role": "Member"}]',
+            "batch_number": 2,
+        },
+        {
+            "name": "Bit Bandits",
+            "username": "team4",
+            "password": "team123",
+            "leader_name": "Dev Kumar",
+            "leader_email": "dev@clash.local",
+            "members_info": '[{"name": "Dev Kumar", "role": "Leader"}, {"name": "Frank Castle", "role": "Member"}]',
+            "batch_number": 2,
+        },
+        {
+            "name": "Syntax Strikers",
+            "username": "team5",
+            "password": "team123",
+            "leader_name": "Eva Mehta",
+            "leader_email": "eva@clash.local",
+            "members_info": '[{"name": "Eva Mehta", "role": "Leader"}, {"name": "Grace Hopper", "role": "Member"}]',
+            "batch_number": 2,
+        },
+    ]
+
+    for t_data in SAMPLE_TEAMS:
+        existing_team = session.exec(select(Team).where(Team.username == t_data["username"])).first()
+        batch_obj = batches.get(t_data["batch_number"])
+        batch_id = batch_obj.id if batch_obj else None
+        hashed_pw = hash_password(t_data["password"])
+        if not existing_team:
+            team = Team(
+                name=t_data["name"],
+                username=t_data["username"],
+                hashed_password=hashed_pw,
+                leader_name=t_data["leader_name"],
+                leader_email=t_data["leader_email"],
+                members_info=t_data["members_info"],
+                batch_id=batch_id,
+                total_score=0,
+            )
+            session.add(team)
+            session.commit()
+            session.refresh(team)
+        else:
+            team = existing_team
+
+        # Ensure corresponding contestant user exists
+        user = session.exec(select(User).where(User.username == team.username)).first()
+        if not user:
+            user = User(
+                username=team.username,
+                hashed_password=hashed_pw,
+                display_name=team.name,
+                role="contestant",
+                team_id=team.id,
+                is_active=True,
+            )
+            session.add(user)
+            session.commit()
+        elif user.team_id != team.id:
+            user.team_id = team.id
+            session.add(user)
+            session.commit()

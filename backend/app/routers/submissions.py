@@ -23,6 +23,7 @@ from app.models import (
     Submission,
     TestCase,
     User,
+    Team,
     BATCH_STATUS_ACTIVE,
     BATCH_STATUS_COMPLETED,
     BATCH_STATUS_NOT_STARTED,
@@ -130,11 +131,23 @@ def _validate_submission_deadline(session: Session, user: User) -> Optional[Batc
     'Submission deadline passed'.
     """
     now = datetime.now(timezone.utc)
+    batch = None
 
-    # Fetch active batch first, fallback to the latest batch
-    batch = session.exec(
-        select(Batch).where(Batch.status == BATCH_STATUS_ACTIVE)
-    ).first()
+    # Check team batch assignment first
+    team = None
+    if getattr(user, "team_id", None):
+        team = session.get(Team, user.team_id)
+    elif getattr(user, "role", None) == "contestant":
+        team = session.exec(select(Team).where(Team.username == user.username)).first()
+
+    if team and team.batch_id:
+        batch = session.get(Batch, team.batch_id)
+
+    # Fallback to active batch or latest batch if no team allotment
+    if batch is None:
+        batch = session.exec(
+            select(Batch).where(Batch.status == BATCH_STATUS_ACTIVE)
+        ).first()
     if batch is None:
         batch = session.exec(select(Batch).order_by(Batch.id.desc())).first()
 
