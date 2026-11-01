@@ -109,6 +109,31 @@ export interface Submission {
   judged_at: string | null;
 }
 
+export interface SampleTestResult {
+  sample_index: number;
+  test_case_id?: number | null;
+  input_data: string;
+  expected_output: string;
+  actual_output?: string | null;
+  stderr?: string | null;
+  compile_error?: string | null;
+  runtime_ms?: number | null;
+  memory_kb?: number | null;
+  verdict: string;
+  passed: boolean;
+}
+
+export interface RunResponse {
+  problem_slug: string;
+  language: string;
+  status: string;
+  verdict: string;
+  compile_error?: string | null;
+  samples_passed: number;
+  samples_total: number;
+  results: SampleTestResult[];
+}
+
 export interface SubmissionStats {
   total_submissions: number;
   accepted_today: number;
@@ -166,6 +191,38 @@ export const getProblem = (slug: string) => {
 };
 
 // ─── Submissions ──────────────────────────────────────────────────────────────
+export const runSampleCode = async (problem_slug: string, language: string, source_code: string) => {
+  if (demoMode.enabled) {
+    await delay(1200);
+    const problem = (MOCK_PROBLEM_DETAIL[problem_slug] as ProblemDetail) || (MOCK_PROBLEM_DETAIL['two-sum'] as ProblemDetail);
+    const samples = problem?.sample_test_cases || [];
+    const results: SampleTestResult[] = samples.map((tc, idx) => ({
+      sample_index: idx + 1,
+      input_data: tc.input_data,
+      expected_output: tc.expected_output,
+      actual_output: tc.expected_output,
+      verdict: 'AC',
+      passed: true,
+      runtime_ms: 45,
+      memory_kb: 12000,
+      stderr: '',
+      compile_error: null,
+    }));
+    const res: RunResponse = {
+      problem_slug,
+      language,
+      status: 'done',
+      verdict: 'AC',
+      compile_error: null,
+      samples_passed: results.length,
+      samples_total: results.length,
+      results,
+    };
+    return mockResp(res);
+  }
+  return api.post<RunResponse>('/api/submissions/run', { problem_slug, language, source_code });
+};
+
 export const submitCode = async (problem_slug: string, language: string, source_code: string) => {
   if (demoMode.enabled) {
     await delay(2000); // simulate judge execution

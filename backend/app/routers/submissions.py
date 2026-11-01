@@ -16,7 +16,7 @@ from sqlmodel import Session, select, func
 from app.auth import get_current_user
 from app.config import SUPPORTED_LANGUAGES
 from app.database import get_session
-from app.judge import evaluate_submission, STATUS_CE
+from app.judge import evaluate_submission, evaluate_sample_submission, STATUS_CE
 from app.models import (
     Batch,
     Problem,
@@ -55,6 +55,31 @@ class SubmitRequest(BaseModel):
         if len(v) > 65_536:
             raise ValueError("Source code exceeds 64 KB limit")
         return v
+
+
+class SampleTestResult(BaseModel):
+    sample_index: int
+    test_case_id: Optional[int] = None
+    input_data: str
+    expected_output: str
+    actual_output: Optional[str] = None
+    stderr: Optional[str] = None
+    compile_error: Optional[str] = None
+    runtime_ms: Optional[float] = None
+    memory_kb: Optional[int] = None
+    verdict: str
+    passed: bool
+
+
+class RunResponse(BaseModel):
+    problem_slug: str
+    language: str
+    status: str
+    verdict: str
+    compile_error: Optional[str] = None
+    samples_passed: int
+    samples_total: int
+    results: List[SampleTestResult]
 
 
 class SubmissionResponse(BaseModel):
@@ -137,6 +162,55 @@ def _validate_submission_deadline(session: Session, user: User) -> Optional[Batc
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+@router.post("/run", response_model=RunResponse)
+def run_sample_submission(
+    body: SubmitRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> RunResponse:
+    # 0. Validate batch deadline
+    _validate_submission_deadline(session, current_user)
+
+    # Resolve problem
+    prob = session.exec(
+        select(Problem).where(Problem.slug == body.problem_slug, Problem.is_visible == True)  # noqa: E712
+    ).first()
+    if not prob:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Problem not found")
+
+    # Fetch ONLY sample test cases
+    sample_cases = session.exec(
+        select(TestCase)
+        .where(TestCase.problem_id == prob.id, TestCase.is_sample == True)  # noqa: E712
+        .order_by(TestCase.order_index)  # type: ignore[arg-type]
+    ).all()
+
+    if not sample_cases:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Problem has no sample test cases configured",
+        )
+
+    run_eval = evaluate_sample_submission(
+        source_code=body.source_code,
+        language=body.language,
+        sample_cases=sample_cases,
+        cpu_time_limit=prob.time_limit_sec,
+        memory_limit=prob.memory_limit_kb,
+    )
+
+    return RunResponse(
+        problem_slug=body.problem_slug,
+        language=body.language,
+        status=run_eval["status"],
+        verdict=run_eval["verdict"],
+        compile_error=run_eval["compile_error"],
+        samples_passed=run_eval["samples_passed"],
+        samples_total=run_eval["samples_total"],
+        results=[SampleTestResult(**r) for r in run_eval["results"]],
+    )
+
+
 @router.post("", response_model=SubmissionResponse)
 def create_submission(
     body: SubmitRequest,

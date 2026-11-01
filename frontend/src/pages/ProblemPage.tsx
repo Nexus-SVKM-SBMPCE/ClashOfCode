@@ -4,8 +4,8 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Editor, { type BeforeMount } from '@monaco-editor/react';
 import '../monacoSetup';
-import { getProblem, submitCode, getMySubmissions, demoMode } from '../api';
-import type { ProblemDetail, Submission } from '../api';
+import { getProblem, submitCode, runSampleCode, getMySubmissions, demoMode } from '../api';
+import type { ProblemDetail, Submission, RunResponse } from '../api';
 import { useCountdownTimer } from '../useCountdownTimer';
 import BattleFinishedModal from '../BattleFinishedModal';
 import { useToast } from '../Toast';
@@ -198,6 +198,9 @@ export default function ProblemPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [lastResult, setLastResult] = useState<Submission | null>(null);
+  const [running, setRunning] = useState(false);
+  const [runResult, setRunResult] = useState<RunResponse | null>(null);
+  const [selectedSampleTab, setSelectedSampleTab] = useState<number>(0);
   const [detailOpen, setDetailOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'problem' | 'submissions'>('problem');
   // Narrow screens show one pane at a time
@@ -213,6 +216,8 @@ export default function ProblemPage() {
     setProblem(null);
     setLoadError(null);
     setLastResult(null);
+    setRunResult(null);
+    setRunning(false);
     setDrafts(STARTERS);
     getProblem(slug)
       .then((r) => setProblem(r.data))
@@ -226,8 +231,31 @@ export default function ProblemPage() {
     try { localStorage.setItem(SPLIT_KEY, String(Math.round(split))); } catch { /* preference only */ }
   }, [split]);
 
+  const handleRun = useCallback(async () => {
+    if (!slug || running || submitting || isContestEnded) return;
+    setRunning(true);
+    setRunResult(null);
+    try {
+      const res = await runSampleCode(slug, lang, code);
+      setRunResult(res.data);
+      setSelectedSampleTab(0);
+      if (res.data.verdict === 'AC') {
+        addToast(`⚡ Sample Tests Passed (${res.data.samples_passed}/${res.data.samples_total})`, 'success');
+      } else if (res.data.verdict === 'CE') {
+        addToast('Spell Error on sample tests', 'error');
+      } else {
+        addToast(`Sample tests: ${res.data.samples_passed}/${res.data.samples_total} passed`, 'info');
+      }
+    } catch (e: any) {
+      const detail = e.response?.data?.detail;
+      addToast('Run failed: ' + (typeof detail === 'string' ? detail : e.message), 'error');
+    } finally {
+      setRunning(false);
+    }
+  }, [slug, lang, code, running, submitting, isContestEnded, addToast]);
+
   const submit = useCallback(async () => {
-    if (!slug || submitting || isContestEnded) return;
+    if (!slug || submitting || running || isContestEnded) return;
     setSubmitting(true);
     setLastResult(null);
     try {
@@ -409,12 +437,30 @@ export default function ProblemPage() {
                 {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
               </select>
             </div>
+            {/* Run Button (Sample Test Driver) */}
+            <button
+              id="run-btn"
+              className="btn btn-secondary"
+              onClick={handleRun}
+              disabled={running || submitting || isContestEnded}
+              title={isContestEnded ? 'Contest has ended.' : 'Run Sample Tests'}
+            >
+              {running ? (
+                <>
+                  <span className="spinner" /> Testing…
+                </>
+              ) : (
+                <>
+                  <Icon name="play" size={14} /> Run
+                </>
+              )}
+            </button>
             {/* Sanchita: disable submit when contest ended */}
             <button
               id="submit-btn"
               className="btn btn-primary"
               onClick={submit}
-              disabled={submitting || isContestEnded}
+              disabled={running || submitting || isContestEnded}
               title={isContestEnded ? 'Contest has ended. Submissions are closed.' : 'Attack (Ctrl+Enter)'}
             >
               {isContestEnded
@@ -458,6 +504,105 @@ export default function ProblemPage() {
             />
           </div>
 
+          {running && (
+            <div className="verdict-strip" role="status">
+              <div className="strip-row">
+                <span className="strip-verdict tone-pending"><span className="spinner" /> ⚡ Testing…</span>
+                <span className="strip-score">Testing your weapon against sample cases…</span>
+              </div>
+            </div>
+          )}
+          {runResult && !running && (
+            <div className="sample-run-console" role="region" aria-label="Sample test results">
+              <div className="console-head">
+                <div className="console-title">
+                  <span className={`verdict-tag verdict-${runResult.verdict.toLowerCase()}`}>
+                    {runResult.verdict === 'AC' ? '✓ Passed' : runResult.verdict === 'CE' ? 'Spell Error' : runResult.verdict}
+                  </span>
+                  <span className="console-summary">
+                    Sample Tests: <b>{runResult.samples_passed}/{runResult.samples_total}</b> passed
+                  </span>
+                </div>
+                <div className="console-actions">
+                  <span className="console-note">No points awarded · Local trial</span>
+                  <button className="btn btn-ghost btn-icon" onClick={() => setRunResult(null)} title="Dismiss console">
+                    <Icon name="x" size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {runResult.compile_error ? (
+                <pre className="strip-detail">{runResult.compile_error}</pre>
+              ) : runResult.results.length === 0 ? (
+                <div className="console-empty">No sample test cases found for this problem.</div>
+              ) : (
+                <>
+                  <div className="sample-tabs" role="tablist">
+                    {runResult.results.map((r, idx) => (
+                      <button
+                        key={idx}
+                        role="tab"
+                        className={`sample-tab ${selectedSampleTab === idx ? 'active' : ''} ${r.passed ? 'tab-pass' : 'tab-fail'}`}
+                        aria-selected={selectedSampleTab === idx}
+                        onClick={() => setSelectedSampleTab(idx)}
+                      >
+                        <span className="status-dot">{r.passed ? '✓' : '✗'}</span> Case {r.sample_index}
+                        {r.runtime_ms != null && <span className="tab-ms">{fmtRuntime(r.runtime_ms)}</span>}
+                      </button>
+                    ))}
+                  </div>
+
+                  {runResult.results[selectedSampleTab] && (
+                    <div className="sample-case-body">
+                      {(() => {
+                        const tc = runResult.results[selectedSampleTab];
+                        const isMatch = tc.passed;
+                        return (
+                          <>
+                            <div className="case-grid">
+                              <div className="case-block">
+                                <div className="case-block-label">
+                                  <span>Input</span>
+                                  <CopyButton text={tc.input_data} label={`Case ${tc.sample_index} Input`} />
+                                </div>
+                                <pre>{tc.input_data}</pre>
+                              </div>
+                              <div className="case-block">
+                                <div className="case-block-label">
+                                  <span>Expected Output</span>
+                                  <CopyButton text={tc.expected_output} label={`Case ${tc.sample_index} Expected`} />
+                                </div>
+                                <pre>{tc.expected_output}</pre>
+                              </div>
+                            </div>
+
+                            <div className="case-grid">
+                              <div className={`case-block ${isMatch ? 'output-match' : 'output-diff'}`}>
+                                <div className="case-block-label">
+                                  <span>Your Stdout {isMatch ? '(Match)' : '(Diff)'}</span>
+                                  {tc.actual_output && <CopyButton text={tc.actual_output} label={`Case ${tc.sample_index} Output`} />}
+                                </div>
+                                <pre>{tc.actual_output ?? '(no stdout recorded)'}</pre>
+                              </div>
+
+                              {tc.stderr ? (
+                                <div className="case-block output-stderr">
+                                  <div className="case-block-label">
+                                    <span>Stderr / Debug Log</span>
+                                  </div>
+                                  <pre>{tc.stderr}</pre>
+                                </div>
+                              ) : null}
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           {submitting && (
             <div className="verdict-strip" role="status">
               <div className="strip-row">

@@ -107,11 +107,12 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
 > **Rule for Team Agents**: Before opening a PR from your branch (`<your_name>`), you MUST execute unit/integration tests, verify no regressions on the baseplate, and check off your completed items below.
 
 ### Yash's Tracker (`branch: yash`)
-- [ ] **Run Button (Sample Test Runner)**:
-  - [ ] Add `POST /api/submissions/run` endpoint (runs only against `sample_test_cases`, does not persist score)
-  - [ ] Update `judge.py` with separate driver pipeline for sample evaluation
-  - [ ] Add "Run" button beside "Submit" in `ProblemPage.tsx`
-  - [ ] Display sample test case I/O results and user stdout in editor panel
+- [x] **Run Button (Sample Test Runner)**:
+  - [x] Add `POST /api/submissions/run` endpoint (runs only against `sample_test_cases`, does not persist score)
+  - [x] Update `judge.py` with separate driver pipeline (`evaluate_sample_submission`) for sample evaluation
+  - [x] Add "Run" button beside "Submit" in `ProblemPage.tsx` with disabled states synced with timer
+  - [x] Display sample test case I/O results, user stdout, and diff/runtime in editor console drawer
+  - [x] Verified: 5/5 backend tests in `tests/test_run_sample.py` & 3/3 frontend tests in `ProblemPage.test.tsx` (build clean, 0 TS errors)
 - [ ] **RBAC (Leaderboard Lockdown)**:
   - [ ] Protect `/api/leaderboard` with role check (HTTP 403 for `contestant` role)
   - [ ] Hide Leaderboard link from navbar and restrict `/leaderboard` route for contestants

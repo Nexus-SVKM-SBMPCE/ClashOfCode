@@ -143,3 +143,83 @@ def evaluate_submission(
         "runtime_ms":   runtime_ms,
         "memory_kb":    memory_kb,
     }
+
+
+def evaluate_sample_submission(
+    source_code: str,
+    language: str,
+    sample_cases: list,
+    cpu_time_limit: float = 2.0,
+    memory_limit: int = 262144,
+) -> dict:
+    """
+    Sample runner driver: executes source_code strictly against public/sample test cases.
+    Returns per-sample results including input, expected output, user stdout, stderr,
+    execution time, and verdict.
+    Never persists any records to DB or leaderboard.
+    """
+    results = []
+    overall_verdict = "AC"
+    compile_error_text = None
+
+    for idx, tc in enumerate(sample_cases):
+        input_data = getattr(tc, "input_data", None) if hasattr(tc, "input_data") else (tc.get("input_data", "") if isinstance(tc, dict) else "")
+        expected_output = getattr(tc, "expected_output", None) if hasattr(tc, "expected_output") else (tc.get("expected_output", "") if isinstance(tc, dict) else "")
+        tc_id = getattr(tc, "id", None) if hasattr(tc, "id") else (tc.get("id", idx + 1) if isinstance(tc, dict) else idx + 1)
+
+        res = evaluate_submission(
+            source_code=source_code,
+            language=language,
+            stdin=input_data or "",
+            expected_output=expected_output or "",
+            cpu_time_limit=cpu_time_limit,
+            memory_limit=memory_limit,
+        )
+
+        verdict = res["verdict"]
+        passed = (verdict == "AC")
+
+        if verdict == "CE":
+            compile_error_text = res["compile_error"]
+            overall_verdict = "CE"
+            results.append({
+                "sample_index": idx + 1,
+                "test_case_id": tc_id,
+                "input_data": input_data,
+                "expected_output": expected_output,
+                "actual_output": res["stdout"],
+                "stderr": res["stderr"],
+                "compile_error": compile_error_text,
+                "runtime_ms": res["runtime_ms"],
+                "memory_kb": res["memory_kb"],
+                "verdict": "CE",
+                "passed": False,
+            })
+            break
+
+        if overall_verdict == "AC" and verdict != "AC":
+            overall_verdict = verdict
+
+        results.append({
+            "sample_index": idx + 1,
+            "test_case_id": tc_id,
+            "input_data": input_data,
+            "expected_output": expected_output,
+            "actual_output": res["stdout"],
+            "stderr": res["stderr"],
+            "compile_error": None,
+            "runtime_ms": res["runtime_ms"],
+            "memory_kb": res["memory_kb"],
+            "verdict": verdict,
+            "passed": passed,
+        })
+
+    samples_passed = sum(1 for r in results if r["passed"])
+    return {
+        "status": "done",
+        "verdict": overall_verdict,
+        "compile_error": compile_error_text,
+        "samples_passed": samples_passed,
+        "samples_total": len(sample_cases),
+        "results": results,
+    }

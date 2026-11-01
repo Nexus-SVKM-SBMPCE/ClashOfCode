@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('./monacoSetup', () => ({}));
 vi.mock('../monacoSetup', () => ({}));
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ProblemPage from './pages/ProblemPage';
 import { useCountdownTimer, type CountdownState } from './useCountdownTimer';
@@ -35,6 +35,29 @@ vi.mock('./api', () => ({
   getProblems: vi.fn().mockResolvedValue({ data: [] }),
   getMySubmissions: vi.fn().mockResolvedValue({ data: [] }),
   submitCode: vi.fn().mockResolvedValue({ data: {} }),
+  runSampleCode: vi.fn().mockResolvedValue({
+    data: {
+      problem_slug: 'two-sum',
+      language: 'python',
+      status: 'done',
+      verdict: 'AC',
+      compile_error: null,
+      samples_passed: 1,
+      samples_total: 1,
+      results: [
+        {
+          sample_index: 1,
+          input_data: '5 9\n2 7 11 15 4\n',
+          expected_output: '1 2\n',
+          actual_output: '1 2\n',
+          verdict: 'AC',
+          passed: true,
+          runtime_ms: 32.5,
+          memory_kb: 10420,
+        },
+      ],
+    },
+  }),
   demoMode: { enabled: false },
 }));
 
@@ -89,7 +112,10 @@ describe('ProblemPage — Contest Expiry & Submission Freeze', () => {
     const editor = screen.getByTestId('monaco-editor');
     expect(editor.getAttribute('data-readonly')).toBe('false');
 
-    // Submit button must be enabled
+    // Run and Submit buttons must be enabled
+    const runBtn = screen.getByRole('button', { name: /Run/i }) as HTMLButtonElement;
+    expect(runBtn.disabled).toBe(false);
+
     const submitBtn = screen.getByRole('button', { name: /Attack|Submit/i }) as HTMLButtonElement;
     expect(submitBtn.disabled).toBe(false);
 
@@ -122,7 +148,10 @@ describe('ProblemPage — Contest Expiry & Submission Freeze', () => {
     const editor = screen.getByTestId('monaco-editor');
     expect(editor.getAttribute('data-readonly')).toBe('true');
 
-    // Submit button must be disabled
+    // Run and Submit buttons must be disabled
+    const runBtn = screen.getByRole('button', { name: /Run/i }) as HTMLButtonElement;
+    expect(runBtn.disabled).toBe(true);
+
     const submitBtn = screen.getByRole('button', { name: /Contest Ended/i }) as HTMLButtonElement;
     expect(submitBtn.disabled).toBe(true);
 
@@ -134,5 +163,40 @@ describe('ProblemPage — Contest Expiry & Submission Freeze', () => {
     expect(
       screen.getByText(/All code submissions are now frozen and the editor is locked/i)
     ).toBeDefined();
+  });
+
+  it('executes sample tests and renders sample output console when Run button is clicked', async () => {
+    const activeState: CountdownState = {
+      status: 'ACTIVE',
+      displayTime: '00:30:00',
+      remainingSeconds: 1800,
+      batchName: 'Batch 1',
+      isPulsing: false,
+    };
+    vi.mocked(useCountdownTimer).mockReturnValue(activeState);
+
+    render(
+      <MemoryRouter>
+        <ProblemPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Two Sum')).toBeDefined();
+    });
+
+    const runBtn = screen.getByRole('button', { name: /Run/i }) as HTMLButtonElement;
+    expect(runBtn.disabled).toBe(false);
+
+    await act(async () => {
+      fireEvent.click(runBtn);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Sample Tests:/i)).toBeDefined();
+      expect(screen.getByText(/1\/1/i)).toBeDefined();
+      expect(screen.getByText(/Case 1/i)).toBeDefined();
+      expect(screen.getByText(/No points awarded/i)).toBeDefined();
+    });
   });
 });

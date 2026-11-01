@@ -435,6 +435,31 @@ code, pre, kbd { font-family: var(--font-mono); }
 }
 .btn-primary:disabled { opacity: 1; background: var(--surface-3); border-color: var(--line-strong); color: var(--text-2); box-shadow: none; text-shadow: none; }
 
+/* Secondary: Steel/Dark Elixir Gem Button */
+.btn-secondary {
+  background: linear-gradient(180deg, #2e3a58 0%, #1e263d 50%, #141b2d 100%);
+  border: 2px solid var(--line-strong);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #3d4f7a 0%, #2a3655 50%, #1a2340 100%);
+  border-color: var(--gold);
+  color: var(--gold-bright);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4), 0 0 12px var(--gold-glow);
+}
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn-ghost { background: transparent; border-color: transparent; color: var(--text-2); box-shadow: none; text-shadow: none; }
 .btn-ghost:hover:not(:disabled) { color: var(--gold); background: var(--gold-soft); border-color: transparent; box-shadow: none; }
 .btn-icon { width: 32px; padding: 0; }
@@ -1093,6 +1118,176 @@ kbd { font-size: 10px; padding: 0 4px; border-radius: 3px; border: 1px solid var
 .tests-bar span { width: 6px; height: 14px; border-radius: 2px; background: var(--line-strong); }
 .tests-bar span.pass { background: var(--ac); box-shadow: 0 0 4px rgba(74, 222, 128, 0.4); }
 .tests-bar span.fail { background: var(--wa); box-shadow: 0 0 4px rgba(255, 77, 90, 0.3); }
+
+/* Sample Run Console — Sample Test Driver Panel */
+.sample-run-console {
+  flex-shrink: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  border-top: 2px solid var(--line-strong);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  animation: stripIn var(--t) var(--ease-out);
+}
+.console-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s2) var(--s4);
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--line);
+}
+.console-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s3);
+}
+.verdict-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.verdict-tag.verdict-ac {
+  background: var(--ac-soft);
+  color: var(--ac);
+  border: 1px solid var(--ac);
+}
+.verdict-tag.verdict-wa, .verdict-tag.verdict-re {
+  background: var(--wa-soft);
+  color: var(--wa);
+  border: 1px solid var(--wa);
+}
+.verdict-tag.verdict-ce {
+  background: var(--ce-soft);
+  color: var(--ce);
+  border: 1px solid var(--ce);
+}
+.console-summary {
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+.console-summary b {
+  color: var(--gold-bright);
+}
+.console-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.console-note {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  font-style: italic;
+}
+.sample-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 var(--s4);
+  background: rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid var(--line);
+}
+.sample-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px var(--s3);
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all var(--t-fast);
+}
+.sample-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+}
+.sample-tab.active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+  background: rgba(245, 166, 35, 0.05);
+}
+.sample-tab .status-dot {
+  font-weight: bold;
+}
+.sample-tab.tab-pass .status-dot {
+  color: var(--ac);
+}
+.sample-tab.tab-fail .status-dot {
+  color: var(--wa);
+}
+.sample-tab .tab-ms {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+}
+.sample-case-body {
+  padding: var(--s3) var(--s4);
+}
+.case-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+  margin-bottom: var(--s2);
+}
+.case-block {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-darker);
+  overflow: hidden;
+}
+.case-block-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px var(--s2);
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  font-weight: 600;
+}
+.case-block pre {
+  padding: var(--s2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 100px;
+  overflow-y: auto;
+  color: var(--text);
+}
+.case-block.output-match {
+  border-color: rgba(74, 222, 128, 0.4);
+}
+.case-block.output-match .case-block-label {
+  color: var(--ac);
+}
+.case-block.output-diff {
+  border-color: rgba(255, 77, 90, 0.4);
+}
+.case-block.output-diff .case-block-label {
+  color: var(--wa);
+}
+.case-block.output-stderr {
+  border-color: rgba(245, 185, 76, 0.4);
+}
+.case-block.output-stderr .case-block-label {
+  color: var(--pending);
+}
+.console-empty {
+  padding: var(--s4);
+  text-align: center;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TOASTS — War notification banners
