@@ -37,6 +37,11 @@ vi.mock('./api', () => ({
   getProblem: vi.fn().mockResolvedValue({ data: null }),
   getMySubmissions: vi.fn().mockResolvedValue({ data: [] }),
   getLeaderboard: vi.fn().mockResolvedValue({ data: [] }),
+  getAdminBatches: vi.fn().mockResolvedValue({ data: [] }),
+  getAdminTeams: vi.fn().mockResolvedValue({ data: [] }),
+  assignTeamBatch: vi.fn().mockResolvedValue({ data: {} }),
+  autoAllotBatches: vi.fn().mockResolvedValue({ data: {} }),
+  startBatchTimer: vi.fn().mockResolvedValue({ data: {} }),
   demoMode: { enabled: false },
 }));
 

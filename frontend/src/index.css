@@ -1629,3 +1629,88 @@ kbd { font-size: 10px; padding: 0 4px; border-radius: 3px; border: 1px solid var
   from { opacity: 0; transform: scale(0.95); }
   to   { opacity: 1; transform: scale(1); }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BATCH MANAGEMENT & CLAN ALLOTMENT (Admin Clan War Room)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.batch-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.batch-filter-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 4px;
+}
+.view-toggle-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.batch-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.batch-card {
+  background: linear-gradient(180deg, #141c2e, #0e1524);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.batch-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.batch-card-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gold-bright);
+}
+.batch-card-meta {
+  font-size: 13px;
+  color: var(--text-2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.allotment-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px;
+  background: linear-gradient(180deg, #141c2e, #0e1524);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  margin-bottom: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.allotment-header {
+  width: 100%;
+  margin-bottom: 4px;
+}
+.allotment-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gold-bright);
+  margin-bottom: 4px;
+}
+.allotment-header p {
+  font-size: 13px;
+  color: var(--text-2);
+}

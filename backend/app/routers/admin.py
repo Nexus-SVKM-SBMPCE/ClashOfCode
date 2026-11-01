@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 
 from app.auth import require_admin
 from app.database import get_session
-from app.models import Problem, TestCase, User
+from app.models import Problem, TestCase, User, Team, Batch
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -206,3 +206,146 @@ def admin_list_users(
         }
         for u in users
     ]
+
+
+class AssignBatchRequest(BaseModel):
+    batch_id: Optional[int] = None
+
+
+class AllotBatchesRequest(BaseModel):
+    teams_per_batch: Optional[int] = None
+    batch_ids: Optional[List[int]] = None
+
+
+# ---------------------------------------------------------------------------
+# Team Management & Batch Allotment (admin only)
+# ---------------------------------------------------------------------------
+@router.get("/teams")
+def admin_list_teams(
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> List[Dict[str, Any]]:
+    teams = session.exec(select(Team)).all()
+    batches = {b.id: b for b in session.exec(select(Batch)).all()}
+    return [
+        {
+            "id": t.id,
+            "name": t.name,
+            "username": t.username,
+            "leader_name": t.leader_name,
+            "leader_email": t.leader_email,
+            "members_info": t.members_info,
+            "batch_id": t.batch_id,
+            "batch_name": batches[t.batch_id].name if t.batch_id in batches else None,
+            "total_score": t.total_score,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+        }
+        for t in teams
+    ]
+
+
+@router.post("/teams/{team_id}/assign-batch")
+def admin_assign_team_batch(
+    team_id: int,
+    body: AssignBatchRequest,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> Dict[str, Any]:
+    team = session.get(Team, team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    if body.batch_id is not None:
+        batch = session.get(Batch, body.batch_id)
+        if not batch:
+            raise HTTPException(status_code=404, detail="Batch not found")
+
+    team.batch_id = body.batch_id
+    session.add(team)
+
+    # Sync User record
+    user = session.exec(select(User).where(User.username == team.username)).first()
+    if user:
+        user.team_id = team.id
+        session.add(user)
+
+    session.commit()
+    session.refresh(team)
+
+    batch_obj = session.get(Batch, team.batch_id) if team.batch_id else None
+    return {
+        "message": f"Team {team.name} assigned to batch {batch_obj.name if batch_obj else 'None'}",
+        "team_id": team.id,
+        "batch_id": team.batch_id,
+        "batch_name": batch_obj.name if batch_obj else None,
+    }
+
+
+@router.post("/batches/allot")
+def admin_allot_batches(
+    body: Optional[AllotBatchesRequest] = None,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> Dict[str, Any]:
+    """
+    Allot teams into N batches of X teams.
+    If teams_per_batch is provided, packs teams up to that limit per batch.
+    Otherwise distributes teams evenly across the batches.
+    """
+    req = body or AllotBatchesRequest()
+    if req.batch_ids:
+        batches = session.exec(select(Batch).where(Batch.id.in_(req.batch_ids)).order_by(Batch.batch_number)).all()  # type: ignore[attr-defined]
+    else:
+        batches = session.exec(select(Batch).order_by(Batch.batch_number)).all()
+
+    if not batches:
+        raise HTTPException(status_code=400, detail="No batches available for allotment")
+
+    teams = session.exec(select(Team).order_by(Team.id)).all()
+    if not teams:
+        return {"message": "No teams registered to allot", "allotted_count": 0}
+
+    teams_per_batch = req.teams_per_batch
+
+    allotments: Dict[int, List[str]] = {b.id: [] for b in batches}  # type: ignore[misc]
+
+    if teams_per_batch and teams_per_batch > 0:
+        # Pack up to X teams per batch
+        batch_idx = 0
+        for team in teams:
+            cur_batch = batches[batch_idx]
+            team.batch_id = cur_batch.id
+            session.add(team)
+            allotments[cur_batch.id].append(team.name)  # type: ignore[index]
+            if len(allotments[cur_batch.id]) >= teams_per_batch and batch_idx + 1 < len(batches):  # type: ignore[index]
+                batch_idx += 1
+    else:
+        # Distribute round-robin evenly across N batches
+        for i, team in enumerate(teams):
+            target_batch = batches[i % len(batches)]
+            team.batch_id = target_batch.id
+            session.add(team)
+            allotments[target_batch.id].append(team.name)  # type: ignore[index]
+
+    # Sync User records
+    for team in teams:
+        user = session.exec(select(User).where(User.username == team.username)).first()
+        if user:
+            user.team_id = team.id
+            session.add(user)
+
+    session.commit()
+
+    return {
+        "message": f"Successfully allotted {len(teams)} teams across {len(batches)} batches",
+        "allotted_count": len(teams),
+        "batches": [
+            {
+                "batch_id": b.id,
+                "batch_name": b.name,
+                "teams_count": len(allotments.get(b.id, [])),  # type: ignore[arg-type]
+                "teams": allotments.get(b.id, []),  # type: ignore[arg-type]
+            }
+            for b in batches
+        ],
+    }

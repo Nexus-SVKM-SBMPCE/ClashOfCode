@@ -1,4 +1,4 @@
-# Project Board: Code Clash — Local Arena
+﻿# Project Board: Code Clash — Local Arena
 
 ## 1. Project Objective & Architecture
 
@@ -124,10 +124,11 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Integrate `/api/auth/me` and `/api/batches/my-batch/timer` to resolve team batch assignment
   - [x] Seed sample teams across Batch 1 and Batch 2 (`team1`–`team5`)
   - [x] Verified: 7/7 backend tests in `tests/test_team_auth.py` (build clean, 0 TS errors)
-- [ ] **Batch-Wise Allotment & Batch Leaderboards**:
-  - [ ] Create `Batch` model (`id`, `batch_number`, `name`, `status`, `timer_started_at`, `duration_minutes`)
-  - [ ] Implement Admin batch management UI to view/assign teams to batches ($N$ batches of $X$ teams)
-  - [ ] Add batch filtering to leaderboard: `GET /api/leaderboard?batch_id=X`
+- [x] **Batch-Wise Allotment & Batch Leaderboards**:
+  - [x] Create `Batch` model (`id`, `batch_number`, `name`, `status`, `timer_started_at`, `duration_minutes`)
+  - [x] Implement Admin batch management UI to view/assign teams to batches ($N$ batches of $X$ teams)
+  - [x] Add batch filtering to leaderboard: `GET /api/leaderboard?batch_id=X`
+  - [x] Verified: 10/10 backend tests in `tests/test_batch_allotment_leaderboard.py` & 2/2 frontend tests in `BatchAllotmentLeaderboard.test.tsx` (build clean, 0 TS errors)
 
 ### Bhakti's Tracker (`branch: bhakti`)
 - [x] **Clash of Clans Theme Design Tokens**:
