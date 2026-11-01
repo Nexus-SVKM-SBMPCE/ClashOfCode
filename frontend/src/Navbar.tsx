@@ -82,9 +82,11 @@ export default function Navbar() {
         <NavLink to="/problems" className={({ isActive }) => (isActive ? 'active' : '')}>
           Quests
         </NavLink>
-        <NavLink to="/leaderboard" className={({ isActive }) => (isActive ? 'active' : '')}>
-          War Ranks
-        </NavLink>
+        {user?.role === 'admin' && (
+          <NavLink to="/leaderboard" className={({ isActive }) => (isActive ? 'active' : '')}>
+            War Ranks
+          </NavLink>
+        )}
       </nav>
 
       <div className="header-right">

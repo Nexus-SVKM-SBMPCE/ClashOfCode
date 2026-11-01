@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from sqlmodel import Session, select, func
 from fastapi import APIRouter, Depends
 
-from app.auth import get_current_user
+from app.auth import require_admin
 from app.database import get_session
 from app.models import Submission, Problem, User
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
 @router.get("")
 def get_leaderboard(
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ) -> List[Dict[str, Any]]:
     # Get all contestants (non-admin)
     users = session.exec(

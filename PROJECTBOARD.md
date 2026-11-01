@@ -113,10 +113,11 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Add "Run" button beside "Submit" in `ProblemPage.tsx` with disabled states synced with timer
   - [x] Display sample test case I/O results, user stdout, and diff/runtime in editor console drawer
   - [x] Verified: 5/5 backend tests in `tests/test_run_sample.py` & 3/3 frontend tests in `ProblemPage.test.tsx` (build clean, 0 TS errors)
-- [ ] **RBAC (Leaderboard Lockdown)**:
-  - [ ] Protect `/api/leaderboard` with role check (HTTP 403 for `contestant` role)
-  - [ ] Hide Leaderboard link from navbar and restrict `/leaderboard` route for contestants
-  - [ ] Ensure only `admin` role can view global and batch leaderboards
+- [x] **RBAC (Leaderboard Lockdown)**:
+  - [x] Protect `/api/leaderboard` with role check (HTTP 403 for `contestant` role via `require_admin`)
+  - [x] Hide Leaderboard ("War Ranks") link from navbar for contestants
+  - [x] Restrict `/leaderboard` route via `RequireAdmin` guard redirecting unprivileged attempts to `/problems`
+  - [x] Verified: 5/5 backend tests in `tests/test_rbac_leaderboard.py` & 4/4 frontend tests in `frontend/src/RbacLeaderboard.test.tsx` (build clean, 0 TS errors)
 - [ ] **Team Database & Single Team Shared Login**:
   - [ ] Create `Team` model (`id`, `name`, `username`, `hashed_password`, `leader_name`, `leader_email`, `batch_id`, `total_score`)
   - [ ] Migrate authentication so teams log in using their shared Team credentials
