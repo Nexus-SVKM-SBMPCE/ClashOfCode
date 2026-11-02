@@ -11,6 +11,7 @@ import BattleFinishedModal from '../BattleFinishedModal';
 import { useToast } from '../Toast';
 import { useAuth } from '../AuthContext';
 import { useArena } from '../lib/arena';
+import { loadDraft, saveDraft, clearDraft } from '../lib/drafts';
 import Balloon from '../components/Balloon';
 import Difficulty from '../components/Difficulty';
 import Icon from '../components/Icon';
@@ -350,6 +351,22 @@ const MD_COMPONENTS: Components = {
   ),
 };
 
+interface EditorState {
+  slug: string | undefined;
+  lang: string;
+  drafts: Record<string, string>;
+  note: 'restored' | 'saved' | null;   // draft status shown in the toolbar
+  savedAt: number;
+}
+
+/** API errors carry `detail` as a plain string or as `{ code, message }`. */
+function errorText(e: any): string {
+  const d = e?.response?.data?.detail;
+  if (typeof d === 'string') return d;
+  if (d && typeof d.message === 'string') return d.message;
+  return e?.message ?? 'Unknown error';
+}
+
 export default function ProblemPage() {
   const { slug } = useParams<{ slug: string }>();
   // Sanchita: contest expiry — lock editor and show modal when COMPLETED
@@ -359,15 +376,54 @@ export default function ProblemPage() {
   const { addToast } = useToast();
   const { user } = useAuth();
   // An admin's submission list spans every team, so solved balloons are contestant-only.
-  const { problems, status } = useArena(user?.role !== 'admin');
+  const { problems, allProblems, status } = useArena(user?.role !== 'admin');
 
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [lang, setLang] = useState('python');
-  // Per-language drafts so switching language never throws away work
-  const [drafts, setDrafts] = useState<Record<string, string>>(() => getStarterDrafts(slug));
+
+  // Code state: per-language drafts (switching language never throws work away) that are also
+  // persisted per team + problem, so leaving to solve another quest first and coming back restores
+  // the code. Re-initialised *during render* when the quest changes — an effect would paint one
+  // frame of the previous quest's code under the new title.
+  const owner = String(user?.id ?? user?.username ?? 'anon');
+  const restoreFor = (s: string | undefined): EditorState => {
+    const starters = getStarterDrafts(s);
+    const saved = s ? loadDraft(owner, s, starters) : null;
+    return {
+      slug: s,
+      lang: saved?.lang ?? 'python',
+      drafts: saved?.drafts ?? starters,
+      note: saved ? 'restored' : null,
+      savedAt: saved?.savedAt ?? 0,
+    };
+  };
+  const [editor, setEditor] = useState(() => restoreFor(slug));
+  if (editor.slug !== slug) setEditor(restoreFor(slug));
+  const { lang, drafts } = editor;
   const code = drafts[lang];
-  const setCode = (v: string) => setDrafts((d) => ({ ...d, [lang]: v }));
+
+  const persist = (nextLang: string, nextDrafts: Record<string, string>) => {
+    if (!slug) return;
+    const savedAt = saveDraft(owner, slug, nextLang, nextDrafts, getStarterDrafts(slug));
+    setEditor((e) => ({ ...e, lang: nextLang, drafts: nextDrafts, note: savedAt ? 'saved' : null, savedAt: savedAt ?? 0 }));
+  };
+  const setCode = (v: string) => persist(lang, { ...drafts, [lang]: v });
+  const setLang = (l: string) => persist(l, drafts);
+
+  // Single-submission rule: once this quest has its one official submission, the forge is sealed
+  const [sealed, setSealed] = useState(false);
+
+  // Because a submission is final, the first Attack press only *arms* the button for a few seconds;
+  // the second press sends it. Guards against a stray Ctrl+Enter spending the team's only attempt.
+  // Admins aren't limited to one submission, so they skip the confirm step.
+  const oneShot = user?.role !== 'admin';
+  const [armed, setArmed] = useState(false);
+  const armTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const disarm = useCallback(() => {
+    clearTimeout(armTimer.current);
+    setArmed(false);
+  }, []);
+  useEffect(() => () => clearTimeout(armTimer.current), []);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [lastResult, setLastResult] = useState<Submission | null>(null);
@@ -391,21 +447,25 @@ export default function ProblemPage() {
     setLastResult(null);
     setRunResult(null);
     setRunning(false);
-    setDrafts(getStarterDrafts(slug));
+    setSealed(false);
+    disarm();
     getProblem(slug)
       .then((r) => setProblem(r.data))
-      .catch((e) => setLoadError(e.response?.status === 404 ? 'Quest not found in the war archives.' : 'Could not load this quest. Is the fortress backend running?'));
+      .catch((e) => setLoadError(
+        e.response?.data?.detail?.code === 'ALREADY_SUBMITTED' ? 'This quest is sealed — your one submission is already in the war council’s hands.'
+          : e.response?.status === 404 ? 'Quest not found in the war archives.'
+          : 'Could not load this quest. Is the fortress backend running?'));
     getMySubmissions(slug)
       .then((r) => setSubmissions(r.data))
       .catch(() => setSubmissions([]));
-  }, [slug]);
+  }, [slug, disarm]);
 
   useEffect(() => {
     try { localStorage.setItem(SPLIT_KEY, String(Math.round(split))); } catch { /* preference only */ }
   }, [split]);
 
   const handleRun = useCallback(async () => {
-    if (!slug || running || submitting || isContestEnded) return;
+    if (!slug || running || submitting || isContestEnded || sealed) return;
     setRunning(true);
     setRunResult(null);
     try {
@@ -420,15 +480,22 @@ export default function ProblemPage() {
         addToast(`Sample tests: ${res.data.samples_passed}/${res.data.samples_total} passed`, 'info');
       }
     } catch (e: any) {
-      const detail = e.response?.data?.detail;
-      addToast('Run failed: ' + (typeof detail === 'string' ? detail : e.message), 'error');
+      if (e.response?.data?.detail?.code === 'ALREADY_SUBMITTED') setSealed(true);
+      addToast('Run failed: ' + errorText(e), 'error');
     } finally {
       setRunning(false);
     }
-  }, [slug, lang, code, running, submitting, isContestEnded, addToast]);
+  }, [slug, lang, code, running, submitting, isContestEnded, sealed, addToast]);
 
   const submit = useCallback(async () => {
-    if (!slug || submitting || running || isContestEnded) return;
+    if (!slug || submitting || running || isContestEnded || sealed) return;
+    if (oneShot && !armed) {
+      setArmed(true);
+      clearTimeout(armTimer.current);
+      armTimer.current = setTimeout(() => setArmed(false), 5000);
+      return;
+    }
+    disarm();
     setSubmitting(true);
     setLastResult(null);
     try {
@@ -440,13 +507,15 @@ export default function ProblemPage() {
       if (res.data.verdict === 'IE') addToast('The war council is unavailable. Please resubmit.', 'error');
       else if (res.data.verdict === 'AC') addToast(`⚔️ Victory! +${res.data.score} pts`, 'success');
       else if (res.data.score > 0) addToast(`Partial conquest: +${res.data.score} pts`, 'info');
+      // The one official attempt is spent (a judge error is not the team's fault, so it isn't)
+      if (res.data.verdict !== 'IE') { setSealed(true); clearDraft(owner, slug); }
     } catch (e: any) {
-      const detail = e.response?.data?.detail;
-      addToast('Attack failed: ' + (typeof detail === 'string' ? detail : e.message), 'error');
+      if (e.response?.status === 409) setSealed(true); // already submitted (second tab / double click)
+      addToast('Attack failed: ' + errorText(e), 'error');
     } finally {
       setSubmitting(false);
     }
-  }, [slug, lang, code, submitting, isContestEnded, addToast]);
+  }, [slug, lang, code, owner, submitting, running, isContestEnded, sealed, oneShot, armed, disarm, addToast]);
 
   // Monaco registers its keybinding once, so route it through a ref to the latest submit
   const submitRef = useRef(submit);
@@ -476,7 +545,10 @@ export default function ProblemPage() {
   );
   if (!problem) return <div className="state"><span className="spinner" /> Summoning quest…</div>;
 
-  const current = problems.find((p) => p.slug === problem.slug);
+  // allProblems, not problems: the quest you're on is hidden from the list once submitted,
+  // but its title balloon should keep showing while you read the verdict.
+  const current = allProblems.find((p) => p.slug === problem.slug);
+  const editorLocked = isContestEnded || sealed;
   const ext = LANGUAGES.find((l) => l.id === lang)?.ext ?? 'txt';
   const verdict = lastResult?.verdict || 'IE';
   const hasCompileOutput = verdict === 'CE' && !!lastResult?.compile_error;
@@ -603,10 +675,17 @@ export default function ProblemPage() {
         <section className="pane pane-editor" aria-label="Code forge">
           <div className="editor-toolbar">
             <span className="editor-file"><Icon name="file" size={14} />solution.{ext}</span>
+            {/* Draft status: lets a team trust that leaving this quest keeps their code */}
+            {!sealed && editor.note && (
+              <span key={editor.note} className="draft-note" role="status" data-note={editor.note}>
+                <Icon name="check" size={12} />
+                <span className="draft-label">{editor.note === 'restored' ? 'Draft restored' : 'Draft saved'}</span>
+              </span>
+            )}
             <label htmlFor="language-select" className="sr-only">Weapon</label>
             <div className="lang-picker">
               <span className="lang-picker-icon" aria-hidden="true">⚔️</span>
-              <select id="language-select" className="select lang-select" value={lang} onChange={(e) => setLang(e.target.value)} disabled={submitting || isContestEnded}>
+              <select id="language-select" className="select lang-select" value={lang} onChange={(e) => setLang(e.target.value)} disabled={submitting || editorLocked}>
                 {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
               </select>
             </div>
@@ -615,8 +694,8 @@ export default function ProblemPage() {
               id="run-btn"
               className="btn btn-secondary"
               onClick={handleRun}
-              disabled={running || submitting || isContestEnded}
-              title={isContestEnded ? 'Contest has ended.' : 'Run Sample Tests'}
+              disabled={running || submitting || editorLocked}
+              title={isContestEnded ? 'Contest has ended.' : sealed ? 'Already submitted — this quest is sealed.' : 'Run Sample Tests'}
             >
               {running ? (
                 <>
@@ -631,19 +710,32 @@ export default function ProblemPage() {
             {/* Sanchita: disable submit when contest ended */}
             <button
               id="submit-btn"
-              className="btn btn-primary"
+              className={`btn btn-primary ${armed ? 'is-armed' : ''}`}
               onClick={submit}
-              disabled={running || submitting || isContestEnded}
-              title={isContestEnded ? 'Contest has ended. Submissions are closed.' : 'Attack (Ctrl+Enter)'}
+              disabled={running || submitting || editorLocked}
+              title={isContestEnded ? 'Contest has ended. Submissions are closed.' : sealed ? 'One submission per quest — already used.' : 'Attack once (Ctrl+Enter) — only one submission is allowed per quest'}
             >
               {isContestEnded
                 ? '⏱ Contest Ended'
+                : sealed
+                  ? <><Icon name="check" size={14} /> Submitted</>
                 : submitting
                   ? <><span className="spinner" /> Battling…</>
+                : armed
+                  ? <>Confirm · final attempt</>
                   : <>⚔️ Attack <kbd>Ctrl ↵</kbd></>
               }
             </button>
+            <span className="sr-only" role="status">{armed ? 'Press again to confirm. Only one submission is allowed for this quest.' : ''}</span>
           </div>
+
+          {sealed && !isContestEnded && (
+            <div className="sealed-note" role="status">
+              <Icon name="check" size={14} />
+              <span><b>Submission locked in.</b> One attack per quest — this quest leaves your list now.</span>
+              <Link to="/problems" className="btn">Next quest</Link>
+            </div>
+          )}
 
           <div className="editor-wrap">
             <Editor
@@ -671,8 +763,8 @@ export default function ProblemPage() {
                 renderLineHighlight: 'line',
                 cursorBlinking: 'smooth',
                 automaticLayout: true,
-                // Sanchita: lock editor when contest has ended
-                readOnly: isContestEnded,
+                // Sanchita: lock editor when contest has ended; also sealed once the one submission is used
+                readOnly: editorLocked,
               }}
             />
           </div>

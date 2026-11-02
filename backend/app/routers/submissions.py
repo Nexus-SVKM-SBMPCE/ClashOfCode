@@ -19,6 +19,7 @@ from app.database import get_session
 from app.judge import evaluate_submission, evaluate_sample_submission, STATUS_CE
 from app.models import (
     Batch,
+    BatchProblem,
     Problem,
     Submission,
     TestCase,
@@ -29,6 +30,12 @@ from app.models import (
     BATCH_STATUS_NOT_STARTED,
 )
 from app.scoring import compute_score
+from app.submission_rules import (
+    ALREADY_SUBMITTED_CODE,
+    ALREADY_SUBMITTED_MESSAGE,
+    SUBMIT_LOCK,
+    has_submitted,
+)
 
 router = APIRouter(prefix="/api/submissions", tags=["submissions"])
 
@@ -207,6 +214,13 @@ def run_sample_submission(
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This quest is not allotted to your batch arena.")
 
 
+    # Single-submission rule: a submitted problem is closed to the team (no more trial runs either)
+    if has_submitted(session, current_user, prob.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": ALREADY_SUBMITTED_CODE, "message": ALREADY_SUBMITTED_MESSAGE},
+        )
+
     # Fetch ONLY sample test cases
     sample_cases = session.exec(
         select(TestCase)
@@ -269,18 +283,23 @@ def create_submission(
             detail="Problem has no test cases configured",
         )
 
-    # Create pending submission record first
-    sub = Submission(
-        user_id=current_user.id,
-        problem_id=prob.id,
-        batch_id=batch.id if batch else None,
-        language=body.language,
-        source_code=body.source_code,
-        status="judging",
-    )
-    session.add(sub)
-    session.commit()
-    session.refresh(sub)
+    # Create pending submission record first. The "already submitted?" check and the insert
+    # share one lock so a double-click / second tab cannot slip a duplicate past the check.
+    # The pending row (verdict NULL) counts as submitted, so it also blocks while we judge.
+    with SUBMIT_LOCK:
+        if has_submitted(session, current_user, prob.id):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=ALREADY_SUBMITTED_MESSAGE)
+        sub = Submission(
+            user_id=current_user.id,
+            problem_id=prob.id,
+            batch_id=batch.id if batch else None,
+            language=body.language,
+            source_code=body.source_code,
+            status="judging",
+        )
+        session.add(sub)
+        session.commit()
+        session.refresh(sub)
 
     # ---------------------------------------------------------------------------
     # Evaluate against all test cases
@@ -291,49 +310,60 @@ def create_submission(
     worst_memory: int = 0
     compile_error_text: Optional[str] = None
 
-    for tc in test_cases:
-        result = evaluate_submission(
-            source_code=body.source_code,
-            language=body.language,
-            stdin=tc.input_data,
-            expected_output=tc.expected_output,
-            cpu_time_limit=prob.time_limit_sec,
-            memory_limit=prob.memory_limit_kb,
-            problem_slug=prob.slug,
-        )
+    try:
+        for tc in test_cases:
+            result = evaluate_submission(
+                source_code=body.source_code,
+                language=body.language,
+                stdin=tc.input_data,
+                expected_output=tc.expected_output,
+                cpu_time_limit=prob.time_limit_sec,
+                memory_limit=prob.memory_limit_kb,
+                problem_slug=prob.slug,
+            )
 
-        verdict = result["verdict"]
-        runtime = result["runtime_ms"] or 0.0
-        memory  = result["memory_kb"] or 0
+            verdict = result["verdict"]
+            runtime = result["runtime_ms"] or 0.0
+            memory  = result["memory_kb"] or 0
 
-        worst_runtime = max(worst_runtime, runtime)
-        worst_memory  = max(worst_memory, memory)
+            worst_runtime = max(worst_runtime, runtime)
+            worst_memory  = max(worst_memory, memory)
 
-        # CE short-circuits: record and break
-        if verdict == "CE":
-            compile_error_text = result["compile_error"]
-            final_verdict = "CE"
+            # CE short-circuits: record and break
+            if verdict == "CE":
+                compile_error_text = result["compile_error"]
+                final_verdict = "CE"
+                test_results.append({
+                    "test_case_id": tc.id,
+                    "is_sample": tc.is_sample,
+                    "verdict": "CE",
+                })
+                break
+
             test_results.append({
                 "test_case_id": tc.id,
                 "is_sample": tc.is_sample,
-                "verdict": "CE",
+                "verdict": verdict,
             })
-            break
 
-        test_results.append({
-            "test_case_id": tc.id,
-            "is_sample": tc.is_sample,
-            "verdict": verdict,
-        })
+            # IE = judge unreachable/broken: remaining tests would fail the same way, so stop early
+            if verdict == "IE":
+                final_verdict = "IE"
+                break
 
-        # IE = judge unreachable/broken: remaining tests would fail the same way, so stop early
-        if verdict == "IE":
-            final_verdict = "IE"
-            break
-
-        # First non-AC verdict wins (order: CE > TLE > MLE > RE > WA)
-        if final_verdict == "AC" and verdict != "AC":
-            final_verdict = verdict
+            # First non-AC verdict wins (order: CE > TLE > MLE > RE > WA)
+            if final_verdict == "AC" and verdict != "AC":
+                final_verdict = verdict
+    except Exception:
+        # Unexpected judge-side crash: release the attempt (IE is "not your code") instead of
+        # leaving a NULL-verdict row that would lock the team out of this problem forever.
+        session.rollback()
+        sub.status = "error"
+        sub.verdict = "IE"
+        sub.judged_at = datetime.now(timezone.utc)
+        session.add(sub)
+        session.commit()
+        raise
 
     # Granular marks: per-test-case points (>= 50% threshold) + difficulty bonus on full AC.
     # A CE means nothing ran, so nothing passed.

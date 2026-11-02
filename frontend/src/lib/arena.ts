@@ -17,6 +17,8 @@ export const balloonFor = (index: number) => BALLOONS[index % BALLOONS.length];
 export interface ProblemStatus {
   solved: boolean;
   attempted: boolean;
+  /** The team's one official submission is spent (mirrors the backend rule: judge errors don't count). */
+  submitted: boolean;
   bestScore: number;
 }
 
@@ -49,14 +51,21 @@ export function useArena(trackStatus: boolean) {
     return () => window.removeEventListener('submission:created', loadStatus);
   }, [loadStatus]);
 
-  return { problems, status, loading, error };
+  // Single-submission rule: a submitted quest disappears from the team's list. The backend already
+  // omits it on reload; filtering here too makes it vanish immediately after submitting (and in demo mode).
+  // Letters/balloons were assigned on the full list above, so they never reshuffle mid-session.
+  const visible = trackStatus ? problems.filter((p) => !status[p.slug]?.submitted) : problems;
+  const submittedCount = trackStatus ? Object.values(status).filter((s) => s.submitted).length : 0;
+
+  return { problems: visible, allProblems: problems, status, submittedCount, loading, error };
 }
 
 function summarize(subs: Submission[]): Record<string, ProblemStatus> {
   const out: Record<string, ProblemStatus> = {};
   for (const s of subs) {
-    const cur = out[s.problem_slug] ?? { solved: false, attempted: false, bestScore: 0 };
+    const cur = out[s.problem_slug] ?? { solved: false, attempted: false, submitted: false, bestScore: 0 };
     cur.attempted = true;
+    if (s.verdict !== 'IE') cur.submitted = true; // IE = judge error, the attempt is not spent
     if (s.verdict === 'AC') cur.solved = true;
     cur.bestScore = Math.max(cur.bestScore, s.score ?? 0);
     out[s.problem_slug] = cur;
