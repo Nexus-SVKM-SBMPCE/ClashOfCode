@@ -243,6 +243,28 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Verified: build OK, Lighthouse a11y 100 / best practices 100 (mobile workspace), 0 external requests, no page overflow 320–1920px. No backend/API/auth changes. NOTE: supersedes the Clash-of-Clans reskin direction in Bhakti's tracker — coordinate before merging.
 - Verification: scoring unit asserts + TestClient integration (mocked Judge0, old-schema migration) ALL PASS; `npm run build` exit 0
 
+#### Vatsal — Round 2 (2026-11-03)
+- [x] **Code draft saving (switch quests without losing work)**:
+  - [x] New `frontend/src/lib/drafts.ts`: per-team + per-quest + per-language drafts in `localStorage` (`cc-draft:v1:<userId>:<slug>`), offline-first, no new endpoint/DB table. Teams sharing one lab PC never see each other's code; corrupt/full storage never breaks the editor
+  - [x] `ProblemPage.tsx`: saves on every edit, restores on return (also after a full reload), remembers the chosen language, small "Draft saved / Draft restored" chip in the editor toolbar. Draft is cleared once the quest is submitted
+  - [x] Verified in a real browser against the real backend (draft survives A→B→A and a full reload; other quests keep their own starter code)
+- [x] **Single submission per quest, submitted quest disappears**:
+  - [x] Backend: `POST /api/submissions` returns `409` on a 2nd submission for the same quest; `GET /api/problems` omits submitted quests; `GET /api/problems/{slug}` and `POST /api/submissions/run` return `403 {code: ALREADY_SUBMITTED}` for them. Rules live in new `backend/app/submission_rules.py` (shared by both routers)
+  - [x] Any verdict (AC/WA/TLE/CE/…) uses the attempt, **except `IE` (judge error)** — that isn't the team's fault, so they can resubmit. A crash mid-judging releases the attempt too. Check-and-insert is guarded by a lock so a double-click / 2nd tab can't slip a duplicate through. **Admins are exempt.**
+  - [x] Frontend: submitted quests vanish from the Problems list and the rail immediately; Problems header shows `N submitted · M remaining` plus an all-done state; after submitting, the forge is sealed (read-only, Run/Attack disabled, "Submission locked in" band); opening a sealed quest by URL shows a clear message
+  - [x] Safety net: because the attempt is final, the first **Attack** press only *arms* the button ("Confirm · final attempt", 5 s, screen-reader announced); the second press submits. Stops a stray Ctrl+Enter from spending a team's only attempt
+  - [x] Own submission history/score is untouched (`GET /api/submissions`, leaderboard, solve times unchanged)
+- [x] **Bugs fixed on the way**: `routers/submissions.py` referenced `BatchProblem` without importing it → `POST /api/submissions/run` returned 500 for every contestant in a batch (import added); `BatchAllotmentLeaderboard.test.tsx` mock was missing `getBatchProblems`/`setBatchProblems`/`autoAllotBatchProblems` (1 failing test → fixed); `submit` callback had a stale-closure lint warning (`running` missing from deps)
+- [x] **Frontend tests**: `npm test` → 6 files / 35 tests pass (new: `lib/drafts.test.ts`, `ProblemDraftAndSeal.test.tsx`); `npm run build` exit 0; lint clean for touched code
+- [ ] **PENDING — backend automated tests** (12 cases in a scratch file: single-submit, IE exemption, hidden quest 403, `/run` 403, admin exemption, concurrency, history intact). Written and confirmed to fail on the old code; to be run **after the Docker/Judge0 restart**, then tick this box
+- [ ] **PENDING — end-to-end with real Judge0** (a real AC/WA submit seals the quest; only a mocked/IE verdict was exercised live)
+- ⚠️ **Heads-up for the team**
+  - **Sanchita** — "remove submission logs tab" overlaps with this work: one submission per quest means the "My Attacks" tab only ever lists ≤1 row. Removing it is safe; the score/verdict still shows in the verdict strip right after submitting
+  - **Sanchita / Yash** — a contestant's `GET /api/problems` list now shrinks as they submit (by design). Anything counting "total quests" from that endpoint should add the team's submitted count
+  - **Bhakti** — "optimal time complexity per problem" is content-only and untouched by this work. `frontend/DESIGN.md` still describes the old lime/graphite theme while the shipped CSS is the gold Clash-of-Clans theme (3 gold `gradient-text` headings in `index.css` are the theme, left as is)
+  - Problem letters (A–E) are computed from the visible list, so they can shift on reload once a quest is submitted (cosmetic)
+  - Pre-existing, not from this work: Monaco is a controlled editor and drops characters under machine-speed typing (reproduced on the untouched `main` too). Real typing speed is fine; worth a look if teams report lost keystrokes
+
 ---
 
 ## 5. Key Decisions

@@ -42,9 +42,10 @@ export default function ProblemsPage() {
   const kingRef = useFixedZoomRef<HTMLDivElement>('bottom left');
   // An admin's submission list spans every team, so solved state is only shown to contestants.
   const isContestant = user?.role !== 'admin';
-  const { problems, status, loading, error } = useArena(isContestant);
+  const { problems, status, submittedCount, loading, error } = useArena(isContestant);
   const navigate = useNavigate();
-  const solvedCount = problems.filter((p) => status[p.slug]?.solved).length;
+  // One submission per quest: submitted quests leave this list, so progress is "submitted vs remaining".
+  const allDone = isContestant && !loading && problems.length === 0 && submittedCount > 0;
 
   return (
     <div className="page page-quests">
@@ -70,7 +71,7 @@ export default function ProblemsPage() {
             <h1 className="page-title">Battle Quests</h1>
             <p className="page-sub">
               {loading ? 'Summoning challenges from the war council…'
-                : isContestant ? `${solvedCount} of ${problems.length} quests conquered`
+                : isContestant ? `${submittedCount} submitted · ${problems.length} remaining`
                 : `${problems.length} challenges in this war`}
             </p>
           </div>
@@ -78,6 +79,7 @@ export default function ProblemsPage() {
 
         <div className="rules">
           <span><Icon name="play" size={14} /> Points are awarded only upon submission to the war council</span>
+          {isContestant && <span className="rule-warn"><Icon name="alert" size={14} /> One submission per quest — once sent, it can’t be reopened</span>}
         </div>
 
         {error ? (
@@ -137,7 +139,11 @@ export default function ProblemsPage() {
                   );
                 })}
                 {!loading && problems.length === 0 && (
-                  <tr><td colSpan={4}><div className="state"><p className="state-title">No quests available</p><p>The war council hasn't published any challenges yet.</p></div></td></tr>
+                  <tr><td colSpan={4}><div className="state">
+                    {allDone
+                      ? <><p className="state-title">All quests submitted</p><p>Your {submittedCount} submissions are with the war council. Nothing left to attack.</p></>
+                      : <><p className="state-title">No quests available</p><p>The war council hasn't published any challenges yet.</p></>}
+                  </div></td></tr>
                 )}
               </tbody>
             </table>

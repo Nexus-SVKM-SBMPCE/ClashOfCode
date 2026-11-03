@@ -31,6 +31,13 @@ from app.models import (
     BATCH_STATUS_NOT_STARTED,
 )
 
+from app.submission_rules import (
+    ALREADY_SUBMITTED_CODE,
+    ALREADY_SUBMITTED_MESSAGE,
+    has_submitted,
+    submitted_problem_ids,
+)
+
 router = APIRouter(prefix="/api/problems", tags=["problems"])
 
 
@@ -130,6 +137,11 @@ def list_problems(
         if assigned_pids:
             query = query.where(Problem.id.in_(assigned_pids))
 
+    # Single-submission rule: a problem the team already submitted is hidden from them
+    submitted = submitted_problem_ids(session, current_user)
+    if submitted:
+        query = query.where(Problem.id.not_in(submitted))  # type: ignore[union-attr]
+
     problems = session.exec(query).all()
     return [
         ProblemSummary(
@@ -173,6 +185,13 @@ def get_problem(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="This quest is not allotted to your batch arena.",
                 )
+
+    # Single-submission rule: once submitted, the briefing is closed to the team
+    if has_submitted(session, current_user, prob.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": ALREADY_SUBMITTED_CODE, "message": ALREADY_SUBMITTED_MESSAGE},
+        )
 
     samples = session.exec(
         select(TestCase).where(

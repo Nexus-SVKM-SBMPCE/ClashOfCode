@@ -22,6 +22,9 @@ vi.mock('./api', () => ({
   assignTeamBatch: vi.fn(),
   autoAllotBatches: vi.fn(),
   startBatchTimer: vi.fn(),
+  getBatchProblems: vi.fn(),
+  setBatchProblems: vi.fn(),
+  autoAllotBatchProblems: vi.fn(),
   demoMode: { enabled: false },
 }));
 
@@ -108,6 +111,7 @@ describe('Batch-Wise Allotment & Batch Leaderboards UI', () => {
     vi.mocked(api.assignTeamBatch).mockResolvedValue({ data: { message: 'Assigned' } } as any);
     vi.mocked(api.autoAllotBatches).mockResolvedValue({ data: { message: 'Allotted' } } as any);
     vi.mocked(api.startBatchTimer).mockResolvedValue({ data: { message: 'Started' } } as any);
+    vi.mocked(api.getBatchProblems).mockResolvedValue({ data: [] } as any);
   });
 
   it('renders batch filter pills and filters leaderboard by batch', async () => {
