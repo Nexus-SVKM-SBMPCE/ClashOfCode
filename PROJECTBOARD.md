@@ -1,4 +1,4 @@
-﻿# Project Board: Code Clash — Local Arena
+# Project Board: Code Clash — Local Arena
 
 ## 1. Project Objective & Architecture
 
@@ -213,6 +213,16 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Persisted `solve_time_seconds` integer in `Submission` table and exposed in `SubmissionResponse` schema
   - [x] Updated `backend/app/routers/leaderboard.py`: aggregates total solve time per user based exclusively on their first successful AC per problem for tie-breaking
   - [x] Verified via automated test suite `backend/test_solve_time.py` (3/3 passed: AC persistence, non-AC exclusion, multiple-solve first-AC tie-breaking)
+- [x] **Real-Time Cross-Client Synchronization & Problem Unlock** *(Phase 5 — COMPLETE)*:
+  - [x] Replaced single-tab in-memory DOM event (`window.dispatchEvent('batch:started')`) with network-aware multi-client polling in `frontend/src/useCountdownTimer.ts`.
+  - [x] Dynamic polling frequency: client polls `/api/batches/my-batch/timer` every 2s while batch is `NOT_STARTED` or error/loading; switches to 30s re-calibration upon `ACTIVE`.
+  - [x] Instant state transition: upon response transitioning from `NOT_STARTED` to `ACTIVE`, immediately derives remaining seconds, updates display, and broadcasts local invalidation (`batch:activated`).
+  - [x] Auto-unlock & Query Re-trigger: `useArena` (`ProblemsPage`) and `ProblemPage` automatically invalidate and re-query `/api/problems` and `/api/problems/{slug}` as soon as timer becomes `ACTIVE` or on `batch:activated`.
+  - [x] Seamless Unmount: `BatchGate.tsx` and `WaitingScreen.tsx` unmount cleanly when `status` becomes `ACTIVE`, rendering problems without requiring manual page refresh.
+  - [x] Cache-Busting Headers: backend `/api/problems`, `/api/problems/{slug}`, and `/api/batches/my-batch/timer` return `Cache-Control: no-store, no-cache, must-revalidate` (including on HTTP 423 error responses).
+  - [x] Dynamic Session Refresh: `_assert_batch_active` and `get_my_batch_timer` call `session.refresh(batch)` to prevent stale identity-map reads from WAL SQLite.
+  - [x] Optimistic Admin UX: 'Start Batch Timer' button in `LeaderboardPage.tsx` features an optimistic loading state (`Starting…` + spinner), 8-second network timeout guard, rollback on failure, and guaranteed button unlock in `finally`.
+  - [x] Verified: 4/4 backend tests pass (`pytest`), 44/44 frontend tests pass (`vitest run`), and `npm run build` exits 0 with 0 TS errors.
 
 ### Vatsal's Tracker (`branch: vatsal`)
 - [x] **Live Submission Counter**:

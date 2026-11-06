@@ -15,7 +15,7 @@ Admin users bypass the lock entirely so they can inspect problems at any time.
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -77,27 +77,50 @@ def _assert_batch_active(session: Session, user: User) -> None:
 
     now = datetime.now(timezone.utc)
 
-    # Find the first active batch (Phase 1: single batch model)
-    batch: Batch | None = session.exec(
-        select(Batch).where(Batch.status != BATCH_STATUS_NOT_STARTED)
-    ).first()
+    # Find the contestant's assigned batch
+    batch: Optional[Batch] = None
+    team = None
+    if user.team_id:
+        team = session.get(Team, user.team_id)
+    elif user.role == "contestant":
+        team = session.exec(select(Team).where(Team.username == user.username)).first()
 
+    if team and team.batch_id:
+        batch = session.get(Batch, team.batch_id)
+
+    # If no team or batch allotment, fallback to earliest batch
     if batch is None:
-        # No active batch found at all — contest has not been started
+        batch = session.exec(select(Batch).order_by(Batch.batch_number)).first()  # type: ignore[arg-type]
+
+    # Explicitly refresh batch to avoid stale session cache
+    if batch is not None:
+        session.refresh(batch)
+
+    if batch is None or batch.status == BATCH_STATUS_NOT_STARTED:
+        # Contest has not been started for this batch
         raise HTTPException(
             status_code=status.HTTP_423_LOCKED,
             detail={
                 "locked": True,
                 "reason": "Contest has not started yet. Please wait for the admin to open the arena.",
             },
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
         )
 
-    # Edge case: timer_started_at might be in the future (shouldn't happen with
-    # the current admin endpoint, but guard anyway)
+    # Edge case: timer_started_at might be in the future (guard anyway)
     if batch.timer_started_at is not None:
         started = batch.timer_started_at
         if started.tzinfo is None:
             started = started.replace(tzinfo=timezone.utc)
+        if started > now:
+            raise HTTPException(
+                status_code=status.HTTP_423_LOCKED,
+                detail={
+                    "locked": True,
+                    "reason": "Contest has not started yet. Please wait for the admin to open the arena.",
+                },
+                headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+            )
         if now < started:
             raise HTTPException(
                 status_code=status.HTTP_423_LOCKED,
@@ -105,6 +128,7 @@ def _assert_batch_active(session: Session, user: User) -> None:
                     "locked": True,
                     "reason": "Contest has not started yet. Please wait for the admin to open the arena.",
                 },
+                headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
             )
 
 
@@ -113,10 +137,12 @@ def _assert_batch_active(session: Session, user: User) -> None:
 # ---------------------------------------------------------------------------
 @router.get("", response_model=List[ProblemSummary])
 def list_problems(
+    response: Response,
     batch_id: Optional[int] = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> List[ProblemSummary]:
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     _assert_batch_active(session, current_user)
 
     target_batch_id = batch_id
@@ -159,9 +185,11 @@ def list_problems(
 @router.get("/{slug}", response_model=ProblemDetail)
 def get_problem(
     slug: str,
+    response: Response,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> ProblemDetail:
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     _assert_batch_active(session, current_user)
 
     prob = session.exec(
