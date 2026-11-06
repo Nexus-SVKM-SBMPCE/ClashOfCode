@@ -56,6 +56,7 @@ class ProblemSummary(BaseModel):
     difficulty: str
     time_limit_sec: float
     memory_limit_kb: int
+    best_time_complexity: Optional[str] = 'O(N)'
 
 
 class ProblemDetail(ProblemSummary):
@@ -151,6 +152,7 @@ def list_problems(
             difficulty=p.difficulty,
             time_limit_sec=p.time_limit_sec,
             memory_limit_kb=p.memory_limit_kb,
+            best_time_complexity=getattr(p, "best_time_complexity", None) or "O(N)",
         )
         for p in problems
     ]

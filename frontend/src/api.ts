@@ -90,6 +90,7 @@ export interface Problem {
   difficulty: 'easy' | 'medium' | 'hard';
   time_limit_sec: number;
   memory_limit_kb: number;
+  best_time_complexity?: string;
 }
 
 export interface ProblemDetail extends Problem {
@@ -111,6 +112,8 @@ export interface Submission {
   runtime_ms: number | null;
   memory_kb: number | null;
   compile_error: string | null;
+  time_complexity?: string | null;
+  time_complexity_verdict?: string | null;
   created_at: string;
   judged_at: string | null;
 }
@@ -137,6 +140,8 @@ export interface RunResponse {
   compile_error?: string | null;
   samples_passed: number;
   samples_total: number;
+  time_complexity?: string | null;
+  time_complexity_verdict?: string | null;
   results: SampleTestResult[];
 }
 
@@ -358,6 +363,7 @@ export interface BatchProblemAdminInfo {
   slug: string;
   title: string;
   difficulty: string;
+  best_time_complexity?: string;
   is_assigned: boolean;
 }
 
@@ -422,3 +428,104 @@ export const getBatchTimer = () => {
 
 export const isBatchLocked = (err: any): boolean =>
   err?.response?.status === 423 || err?.status === 423;
+
+// ─── Admin Problem & Test Case Management ─────────────────────────────────────
+export interface ProblemCreateData {
+  slug: string;
+  title: string;
+  statement: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  best_time_complexity: string;
+  time_limit_sec: number;
+  memory_limit_kb: number;
+}
+
+export interface TestCaseCreateData {
+  input_data: string;
+  expected_output: string;
+  is_sample: boolean;
+  order_index?: number;
+}
+
+export interface AdminTestCaseInfo {
+  id: number;
+  order_index: number;
+  is_sample: boolean;
+  input_data: string;
+  expected_output: string;
+}
+
+export interface AdminProblemItem {
+  id: number;
+  slug: string;
+  title: string;
+  difficulty: string;
+  is_visible: boolean;
+  best_time_complexity: string;
+  time_limit_sec: number;
+  memory_limit_kb: number;
+  test_case_count: number;
+}
+
+export const getAdminProblems = () => {
+  if (demoMode.enabled) {
+    return mockResp<AdminProblemItem[]>(
+      MOCK_PROBLEMS.map((p) => ({
+        ...p,
+        is_visible: true,
+        best_time_complexity: 'O(N)',
+        test_case_count: 5,
+      }))
+    );
+  }
+  return api.get<AdminProblemItem[]>('/api/admin/problems');
+};
+
+export const createAdminProblem = (data: ProblemCreateData) => {
+  if (demoMode.enabled) {
+    return mockResp({ id: 99, slug: data.slug, message: 'Problem created' });
+  }
+  return api.post<{ id: number; slug: string; message: string }>('/api/admin/problems', data);
+};
+
+export const updateAdminProblem = (problemId: number, data: Partial<ProblemCreateData & { is_visible: boolean }>) => {
+  if (demoMode.enabled) return mockResp({ message: 'Problem updated' });
+  return api.patch<{ message: string }>(`/api/admin/problems/${problemId}`, data);
+};
+
+export const deleteAdminProblem = (problemId: number) => {
+  if (demoMode.enabled) return mockResp(undefined);
+  return api.delete<void>(`/api/admin/problems/${problemId}`);
+};
+
+export const getAdminTestCases = (problemId: number) => {
+  if (demoMode.enabled) return mockResp<AdminTestCaseInfo[]>([]);
+  return api.get<AdminTestCaseInfo[]>(`/api/admin/problems/${problemId}/testcases`);
+};
+
+export const addAdminTestCase = (problemId: number, data: TestCaseCreateData) => {
+  if (demoMode.enabled) return mockResp({ id: 101, message: 'Test case added' });
+  return api.post<{ id: number; message: string }>(`/api/admin/problems/${problemId}/testcases`, data);
+};
+
+export const deleteAdminTestCase = (problemId: number, testCaseId: number) => {
+  if (demoMode.enabled) return mockResp(undefined);
+  return api.delete<void>(`/api/admin/problems/${problemId}/testcases/${testCaseId}`);
+};
+
+export const createAdminBatch = (data: { batch_number: number; name: string; duration_minutes: number }) => {
+  if (demoMode.enabled) {
+    return mockResp<BatchAdminInfo>({
+      id: 99,
+      batch_number: data.batch_number,
+      name: data.name,
+      status: 'NOT_STARTED',
+      timer_started_at: null,
+      duration_minutes: data.duration_minutes,
+      remaining_seconds: null,
+      server_now_utc: new Date().toISOString(),
+    });
+  }
+  return api.post<BatchAdminInfo>('/api/admin/batches', data);
+};
+

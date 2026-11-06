@@ -12,7 +12,7 @@ ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "720"))
 JUDGE0_URL: str = os.getenv("JUDGE0_URL", "http://127.0.0.1:2358")
 
-_cors_raw = os.getenv("CORS_ORIGINS", '["http://localhost:5173"]')
+_cors_raw = os.getenv("CORS_ORIGINS", *'')
 try:
     import json
     CORS_ORIGINS: List[str] = json.loads(_cors_raw)

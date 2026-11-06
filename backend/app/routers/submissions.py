@@ -1,3 +1,4 @@
+from app.complexity import evaluate_time_complexity
 """
 Submissions router:
   POST /api/submissions          — evaluate all hidden tests, compute final verdict
@@ -88,6 +89,8 @@ class RunResponse(BaseModel):
     samples_passed: int
     samples_total: int
     results: List[SampleTestResult]
+    time_complexity: Optional[str] = None
+    time_complexity_verdict: Optional[str] = None
 
 
 class SubmissionResponse(BaseModel):
@@ -127,6 +130,8 @@ def _to_response(sub: Submission, problem_slug: str, include_ce: bool = True) ->
         created_at=sub.created_at.isoformat(),
         judged_at=sub.judged_at.isoformat() if sub.judged_at else None,
         solve_time_seconds=sub.solve_time_seconds,
+        time_complexity=getattr(sub, "time_complexity", None),
+        time_complexity_verdict=getattr(sub, "time_complexity_verdict", None),
     )
 
 
@@ -243,6 +248,13 @@ def run_sample_submission(
         problem_slug=prob.slug,
     )
 
+    # Real-time time complexity evaluation
+    comp_eval = evaluate_time_complexity(
+        source_code=body.source_code,
+        language=body.language,
+        expected_complexity=getattr(prob, "best_time_complexity", None) or "O(N)",
+    )
+
     return RunResponse(
         problem_slug=body.problem_slug,
         language=body.language,
@@ -252,6 +264,8 @@ def run_sample_submission(
         samples_passed=run_eval["samples_passed"],
         samples_total=run_eval["samples_total"],
         results=[SampleTestResult(**r) for r in run_eval["results"]],
+        time_complexity=comp_eval.get("calculated_complexity"),
+        time_complexity_verdict=comp_eval.get("verdict"),
     )
 
 
