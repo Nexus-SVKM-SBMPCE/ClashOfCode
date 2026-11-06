@@ -593,6 +593,12 @@ export default function ProblemPage() {
             </h1>
             <div className="pane-meta">
               <Difficulty value={problem.difficulty} />
+              {problem.best_time_complexity && (
+                <span className="meta" title="Optimal Asymptotic Complexity">
+                  <span style={{ color: 'var(--gold-bright)', fontWeight: 700 }}>⚡ Optimal:</span>
+                  <span className="mono" style={{ color: 'var(--gold-bright)', fontWeight: 700 }}>{problem.best_time_complexity}</span>
+                </span>
+              )}
               <span className="meta"><Icon name="clock" size={14} /> <span className="mono">{problem.time_limit_sec}s</span></span>
               <span className="meta"><Icon name="memory" size={14} /> <span className="mono">{Math.round(problem.memory_limit_kb / 1024)} MB</span></span>
             </div>
@@ -787,6 +793,38 @@ export default function ProblemPage() {
                   <span className="console-summary">
                     Sample Tests: <b>{runResult.samples_passed}/{runResult.samples_total}</b> passed
                   </span>
+                  {runResult.time_complexity && (
+                    <span
+                      style={{
+                        marginLeft: 10,
+                        padding: '2px 8px',
+                        borderRadius: 6,
+                        background:
+                          runResult.time_complexity_verdict === 'OPTIMAL'
+                            ? 'rgba(34, 197, 94, 0.15)'
+                            : runResult.time_complexity_verdict === 'ACCEPTABLE'
+                            ? 'rgba(234, 179, 8, 0.15)'
+                            : 'rgba(239, 68, 68, 0.15)',
+                        border: `1px solid ${
+                          runResult.time_complexity_verdict === 'OPTIMAL'
+                            ? 'var(--ac)'
+                            : runResult.time_complexity_verdict === 'ACCEPTABLE'
+                            ? 'var(--pending)'
+                            : 'var(--wa)'
+                        }`,
+                        color:
+                          runResult.time_complexity_verdict === 'OPTIMAL'
+                            ? 'var(--ac)'
+                            : runResult.time_complexity_verdict === 'ACCEPTABLE'
+                            ? 'var(--pending)'
+                            : 'var(--wa)',
+                        fontWeight: 700,
+                        fontSize: 11,
+                      }}
+                    >
+                      ⚡ Time: {runResult.time_complexity} ({runResult.time_complexity_verdict})
+                    </span>
+                  )}
                 </div>
                 <div className="console-actions">
                   <span className="console-note">No points awarded · Local trial</span>
@@ -878,6 +916,48 @@ export default function ProblemPage() {
                 <ScoreLine sub={lastResult} simulated={demoMode.enabled} />
                 <TestsBar passed={lastResult.tests_passed} total={verdict === 'CE' || verdict === 'IE' ? 0 : lastResult.tests_total} />
                 <span className="strip-metrics">
+                  {lastResult.time_complexity && (
+                    <span
+                      className="meta"
+                      title={
+                        lastResult.time_complexity_verdict === 'OPTIMAL'
+                          ? 'Optimal asymptotic time complexity'
+                          : `Target complexity: ${problem.best_time_complexity || 'O(N)'}`
+                      }
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: 6,
+                        background:
+                          lastResult.time_complexity_verdict === 'OPTIMAL'
+                            ? 'rgba(34, 197, 94, 0.15)'
+                            : lastResult.time_complexity_verdict === 'ACCEPTABLE'
+                            ? 'rgba(234, 179, 8, 0.15)'
+                            : 'rgba(239, 68, 68, 0.15)',
+                        border: `1px solid ${
+                          lastResult.time_complexity_verdict === 'OPTIMAL'
+                            ? 'var(--ac)'
+                            : lastResult.time_complexity_verdict === 'ACCEPTABLE'
+                            ? 'var(--pending)'
+                            : 'var(--wa)'
+                        }`,
+                        color:
+                          lastResult.time_complexity_verdict === 'OPTIMAL'
+                            ? 'var(--ac)'
+                            : lastResult.time_complexity_verdict === 'ACCEPTABLE'
+                            ? 'var(--pending)'
+                            : 'var(--wa)',
+                        fontWeight: 700,
+                        fontSize: 11,
+                      }}
+                    >
+                      ⚡ Complexity: {lastResult.time_complexity}{' '}
+                      {lastResult.time_complexity_verdict === 'OPTIMAL'
+                        ? '(Optimal)'
+                        : lastResult.time_complexity_verdict === 'ACCEPTABLE'
+                        ? '(Acceptable)'
+                        : `(Suboptimal · Best: ${problem.best_time_complexity || 'O(N)'})`}
+                    </span>
+                  )}
                   {lastResult.runtime_ms !== null && <span className="meta" title="Slowest test"><Icon name="clock" size={13} /> <span className="mono">{fmtRuntime(lastResult.runtime_ms)}</span></span>}
                   {lastResult.memory_kb !== null && <span className="meta" title="Peak memory"><Icon name="memory" size={13} /> <span className="mono">{fmtMemory(lastResult.memory_kb)}</span></span>}
                   {hasCompileOutput && (

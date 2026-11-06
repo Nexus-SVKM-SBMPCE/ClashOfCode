@@ -28,6 +28,7 @@ PROBLEMS = [
         "slug": "two-sum",
         "title": "Two Sum",
         "difficulty": "medium",
+        "best_time_complexity": "O(N)",
         "time_limit_sec": 2.0,
         "memory_limit_kb": 262144,
         "statement": """## Two Sum
@@ -73,6 +74,7 @@ Print two space-separated 1-based indices `i j` where `i < j`.
         "slug": "fibonacci",
         "title": "Fibonacci Number",
         "difficulty": "easy",
+        "best_time_complexity": "O(N)",
         "time_limit_sec": 2.0,
         "memory_limit_kb": 262144,
         "statement": """## Fibonacci Number
@@ -110,6 +112,7 @@ A single integer — the n-th Fibonacci number.
         "slug": "palindrome-check",
         "title": "Palindrome Check",
         "difficulty": "easy",
+        "best_time_complexity": "O(N)",
         "time_limit_sec": 2.0,
         "memory_limit_kb": 262144,
         "statement": """## Palindrome Check
@@ -147,6 +150,7 @@ YES
         "slug": "binary-search",
         "title": "Binary Search",
         "difficulty": "medium",
+        "best_time_complexity": "O(log N)",
         "time_limit_sec": 2.0,
         "memory_limit_kb": 262144,
         "statement": """## Binary Search
@@ -187,6 +191,7 @@ A single integer — the 1-based index of `T`, or `-1`.
         "slug": "max-subarray",
         "title": "Maximum Subarray Sum",
         "difficulty": "hard",
+        "best_time_complexity": "O(N)",
         "time_limit_sec": 2.0,
         "memory_limit_kb": 262144,
         "statement": """## Maximum Subarray Sum (Kadane's Algorithm)
@@ -244,15 +249,22 @@ def seed(session: Session) -> None:
     # Problems + test cases
     for p_data in PROBLEMS:
         exists = session.exec(select(Problem).where(Problem.slug == p_data["slug"])).first()
-        if exists and exists.difficulty != p_data["difficulty"]:
-            # Keep the 2 easy / 2 medium / 1 hard contest mix on older databases
-            exists.difficulty = p_data["difficulty"]
-            session.add(exists)
+        if exists:
+            changed = False
+            if exists.difficulty != p_data["difficulty"]:
+                exists.difficulty = p_data["difficulty"]
+                changed = True
+            if not getattr(exists, "best_time_complexity", None) and "best_time_complexity" in p_data:
+                exists.best_time_complexity = p_data["best_time_complexity"]
+                changed = True
+            if changed:
+                session.add(exists)
         if not exists:
             prob = Problem(
                 slug=p_data["slug"],
                 title=p_data["title"],
                 difficulty=p_data["difficulty"],
+                best_time_complexity=p_data.get("best_time_complexity", "O(N)"),
                 time_limit_sec=p_data["time_limit_sec"],
                 memory_limit_kb=p_data["memory_limit_kb"],
                 statement=p_data["statement"],

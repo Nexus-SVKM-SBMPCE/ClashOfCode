@@ -9,8 +9,10 @@ import {
   getBatchProblems,
   setBatchProblems,
   autoAllotBatchProblems,
+  createAdminBatch,
   demoMode,
 } from '../api';
+import QuestForge from '../components/QuestForge';
 import type { LeaderboardEntry, BatchAdminInfo, TeamAdminInfo, BatchProblemAdminInfo } from '../api';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../Toast';
@@ -20,7 +22,7 @@ export default function LeaderboardPage() {
   const { user } = useAuth();
   const { addToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'rankings' | 'allotment'>('rankings');
+  const [activeTab, setActiveTab] = useState<'rankings' | 'allotment' | 'forge'>('rankings');
   const [board, setBoard] = useState<LeaderboardEntry[]>([]);
   const [batches, setBatches] = useState<BatchAdminInfo[]>([]);
   const [teams, setTeams] = useState<TeamAdminInfo[]>([]);
@@ -35,6 +37,38 @@ export default function LeaderboardPage() {
   const [teamsPerBatchInput, setTeamsPerBatchInput] = useState<number>(2);
   const [selectedConfigBatchId, setSelectedConfigBatchId] = useState<number>(1);
   const [batchProblems, setBatchProblemsList] = useState<BatchProblemAdminInfo[]>([]);
+
+  // Create Batch Form State
+  const [showCreateBatch, setShowCreateBatch] = useState(false);
+  const [newBatchNumber, setNewBatchNumber] = useState<number>(3);
+  const [newBatchName, setNewBatchName] = useState<string>('Batch 3');
+  const [newBatchDuration, setNewBatchDuration] = useState<number>(60);
+  const [creatingBatch, setCreatingBatch] = useState(false);
+
+  const handleCreateBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBatchName.trim() || newBatchNumber <= 0) {
+      addToast('Please provide valid batch number and name', 'error');
+      return;
+    }
+    setCreatingBatch(true);
+    try {
+      await createAdminBatch({
+        batch_number: newBatchNumber,
+        name: newBatchName.trim(),
+        duration_minutes: newBatchDuration,
+      });
+      addToast(`🛡️ ${newBatchName} created successfully!`, 'success');
+      setShowCreateBatch(false);
+      setNewBatchNumber((n) => n + 1);
+      setNewBatchName(`Batch ${newBatchNumber + 1}`);
+      loadBatches();
+    } catch (err: any) {
+      addToast(err.response?.data?.detail || 'Failed to create batch', 'error');
+    } finally {
+      setCreatingBatch(false);
+    }
+  };
 
   const refreshLeaderboard = useCallback((batchId?: number) => {
     setRefreshing(true);
@@ -232,13 +266,21 @@ export default function LeaderboardPage() {
             >
               🛡️ Clan Allotment & Batches
             </button>
+            <button
+              className={`btn btn-sm ${activeTab === 'forge' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab('forge')}
+            >
+              ⚒️ Quest Forge & Complexity
+            </button>
           </div>
         )}
 
         {demoMode.enabled && <div className="demo-note"><span className="demo-tag">Demo</span> Sample war standings, not real battle results.</div>}
         {error && <div className="inline-error" role="alert"><Icon name="alert" size={14} /> {error}</div>}
 
-        {activeTab === 'rankings' ? (
+        {activeTab === 'forge' ? (
+          <QuestForge />
+        ) : activeTab === 'rankings' ? (
           <>
             {/* Batch Filter Pills */}
             <div className="batch-filter-bar">
@@ -325,7 +367,91 @@ export default function LeaderboardPage() {
           </>
         ) : (
           <>
-            {/* Batches Overview Cards */}
+            {/* Batches Overview Cards & New Batch Action */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gold-bright)' }}>
+                  🛡️ Active Batches & Countdown Timers
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>
+                  Manage arena rounds, start timers, and distribute clans and questions.
+                </p>
+              </div>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setShowCreateBatch((s) => !s)}
+              >
+                <Icon name="plus" size={14} /> {showCreateBatch ? 'Cancel' : 'Create New Batch'}
+              </button>
+            </div>
+
+            {showCreateBatch && (
+              <form
+                onSubmit={handleCreateBatch}
+                className="panel"
+                style={{
+                  padding: 18,
+                  marginBottom: 20,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 14,
+                  alignItems: 'flex-end',
+                  border: '2px solid var(--gold)',
+                }}
+              >
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>
+                    Batch Number
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="input mono"
+                    value={newBatchNumber}
+                    onChange={(e) => setNewBatchNumber(parseInt(e.target.value) || 1)}
+                    style={{ width: 100, height: 36 }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>
+                    Batch Name
+                  </label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={newBatchName}
+                    onChange={(e) => setNewBatchName(e.target.value)}
+                    style={{ width: 180, height: 36 }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>
+                    Duration (Minutes)
+                  </label>
+                  <input
+                    type="number"
+                    min="5"
+                    max="300"
+                    className="input mono"
+                    value={newBatchDuration}
+                    onChange={(e) => setNewBatchDuration(parseInt(e.target.value) || 60)}
+                    style={{ width: 120, height: 36 }}
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-sm"
+                  disabled={creatingBatch}
+                  style={{ height: 36, padding: '0 16px' }}
+                >
+                  {creatingBatch ? 'Forging…' : 'Save Batch'}
+                </button>
+              </form>
+            )}
+
             <div className="batch-cards-grid">
               {batches.map((b) => {
                 const isActive = b.status === 'ACTIVE';
@@ -523,6 +649,7 @@ export default function LeaderboardPage() {
                     <th style={{ width: 50 }}>Allot</th>
                     <th>Quest Title</th>
                     <th>Difficulty</th>
+                    <th>Optimal Complexity</th>
                     <th style={{ width: 140 }}>Slug</th>
                   </tr>
                 </thead>
@@ -563,6 +690,22 @@ export default function LeaderboardPage() {
                           </span>
                         </td>
                         <td>
+                          <span
+                            className="mono"
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              border: '1px solid var(--gold)',
+                              color: 'var(--gold-bright)',
+                            }}
+                          >
+                            ⚡ {p.best_time_complexity || 'O(N)'}
+                          </span>
+                        </td>
+                        <td>
                           <span className="mono" style={{ fontSize: '12px', color: 'var(--text-3)' }}>{p.slug}</span>
                         </td>
                       </tr>
@@ -570,7 +713,7 @@ export default function LeaderboardPage() {
                   })}
                   {batchProblems.length === 0 && (
                     <tr>
-                      <td colSpan={4} style={{ textAlign: 'center', padding: '20px' }}>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>
                         No questions loaded.
                       </td>
                     </tr>

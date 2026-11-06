@@ -21,6 +21,8 @@ const PATHS = {
   code: <path d="M8.5 7L3.5 12l5 5M15.5 7l5 5-5 5" />,
   list: <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />,
   pulse: <path d="M3 12h4l2.5-6 5 12 2.5-6h4" />,
+  plus: <path d="M12 5v14M5 12h14" />,
+  eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>,
 } as const;
 
 export type IconName = keyof typeof PATHS;

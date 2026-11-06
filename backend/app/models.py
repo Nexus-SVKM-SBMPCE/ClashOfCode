@@ -47,6 +47,12 @@ _SUBMISSION_COLUMNS = {
     "tests_total": "INTEGER NOT NULL DEFAULT 0",
     "solve_time_seconds": "INTEGER DEFAULT NULL",
     "batch_id": "INTEGER DEFAULT NULL",
+    "time_complexity": "VARCHAR(50) DEFAULT NULL",
+    "time_complexity_verdict": "VARCHAR(50) DEFAULT NULL",
+}
+
+_PROBLEM_COLUMNS = {
+    "best_time_complexity": "VARCHAR(50) DEFAULT 'O(N)'",
 }
 
 _USER_COLUMNS = {
@@ -64,6 +70,12 @@ def _migrate_columns():
                 if name not in sub_cols:
                     conn.execute(text(f"ALTER TABLE submissions ADD COLUMN {name} {ddl}"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_submissions_created_at ON submissions (created_at)"))
+
+        if inspector.has_table("problems"):
+            prob_cols = {c["name"] for c in inspector.get_columns("problems")}
+            for name, ddl in _PROBLEM_COLUMNS.items():
+                if name not in prob_cols:
+                    conn.execute(text(f"ALTER TABLE problems ADD COLUMN {name} {ddl}"))
 
         if inspector.has_table("users"):
             user_cols = {c["name"] for c in inspector.get_columns("users")}
@@ -136,7 +148,8 @@ class Problem(SQLModel, table=True):
     difficulty: str = Field(default="medium")   # "easy" | "medium" | "hard"
     time_limit_sec: float = Field(default=2.0)
     memory_limit_kb: int = Field(default=262144)
-    is_visible: bool = Field(default=True)
+    is_visible: bool = Field(default=True)
+    best_time_complexity: Optional[str] = Field(default="O(N)", max_length=50)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     test_cases: List["TestCase"] = Relationship(back_populates="problem")
@@ -217,7 +230,9 @@ class Submission(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Per-question solve time for tie-breaking (seconds elapsed from batch start to first AC)
-    solve_time_seconds: Optional[int] = None    # NULL until the submission is AC
+    solve_time_seconds: Optional[int] = None    # NULL until the submission is AC
+    time_complexity: Optional[str] = None       # Real-time evaluated time complexity, e.g. O(N)
+    time_complexity_verdict: Optional[str] = None  # OPTIMAL | ACCEPTABLE | SUBOPTIMAL
     batch_id: Optional[int] = Field(default=None, foreign_key="batches.id", index=True)
 
     user: Optional[User] = Relationship(back_populates="submissions")

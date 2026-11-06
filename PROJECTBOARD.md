@@ -161,6 +161,30 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Complete problem solve bonus: Easy (+2), Medium (+3), Hard (+5) added upon passing 100% of test cases
   - [x] Leaderboard aggregates best score per problem with tie-breaking based on solve time
   - [x] Verified: 32/32 tests pass in test suite (`pytest -v`)
+- [x] **Deterministic Mathematical Time Complexity Evaluator (Zero-AI, Sub-Millisecond)**:
+  - [x] Built native AST analysis engine in `backend/app/complexity.py` (`PythonASTComplexityAnalyzer`): loop depth analysis, constant bound detection (`range(26)` -> $O(1)$), logarithmic stride detection (`*=` / `/=` / `>>=` / binary search -> $O(\log N)$), nested loop multiplication, asymptotic dominance, sorting detection ($O(N \log N)$), unmemoized exponential recursion detection ($O(2^N)$), and memoization discounting (`@lru_cache`, `memo` dict -> $O(N)$)
+  - [x] Lexical control-flow analyzer for C, C++, Java (`analyze_lexical_complexity`)
+  - [x] Asymptotic complexity comparator: evaluates calculated vs optimal complexity returning `OPTIMAL`, `ACCEPTABLE`, or `SUBOPTIMAL`
+  - [x] Average execution time < 0.2ms, fully offline, deterministic, zero-AI
+  - [x] Verified: 11/11 tests pass in `tests/test_complexity_engine.py`
+- [x] **Database Schema & Pipeline Integration**:
+  - [x] Added `best_time_complexity` to `Problem` model and `time_complexity` + `time_complexity_verdict` to `Submission`
+  - [x] Implemented safe SQLite `ALTER TABLE` auto-migration in `_migrate_columns()`
+  - [x] Integrated real-time complexity evaluation into `/api/submissions/run` and `/api/submissions`
+  - [x] Verified: 48/48 backend tests pass (`backend/.venv/Scripts/pytest.exe`)
+- [x] **Admin Quest Forge UI & Optimal Complexity Config**:
+  - [x] Built `frontend/src/components/QuestForge.tsx` matching Clash of Clans 3D beveled stone-and-gold styling
+  - [x] Title, auto-slug, difficulty, **Best Time Complexity** selector ($O(1)$, $O(\log N)$, $O(N)$, $O(N \log N)$, $O(N^2)$, $O(N^3)$, $O(2^N)$), time limit, memory limit
+  - [x] Markdown problem statement editor with preview mode toggle
+  - [x] Dynamic test cases manager (stdin input, stdout output, public sample vs hidden toggle, add/remove cases)
+  - [x] Active Quest Roster table with optimal complexity badges and demolish action
+  - [x] Integrated as third tab `⚒️ Quest Forge & Complexity` in `frontend/src/pages/LeaderboardPage.tsx`
+- [x] **Unified Batch Allotment & Contestant Complexity Feedback**:
+  - [x] Added "Create New Batch" form card in `LeaderboardPage.tsx` (Batch Number, Name, Duration)
+  - [x] Added Optimal Time Complexity badge to the Arena Quest Allotment table
+  - [x] Problem statement header displays `⚡ Optimal: {best_time_complexity}` badge
+  - [x] Sample test console and attack verdict strip display evaluated asymptotic complexity with verdict (`⚡ Time: O(N) (OPTIMAL)`)
+  - [x] Verified: `npm test` passes all 7 suites / 39 tests; `npm run build` exits 0 (zero TS errors)
 
 
 ### Bhakti's Tracker (`branch: bhakti`)

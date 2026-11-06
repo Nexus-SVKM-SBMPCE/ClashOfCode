@@ -23,6 +23,7 @@ class ProblemCreate(BaseModel):
     title: str
     statement: str
     difficulty: str = "medium"
+    best_time_complexity: str = "O(N)"
     time_limit_sec: float = 2.0
     memory_limit_kb: int = 262144
 
@@ -52,6 +53,7 @@ class ProblemUpdate(BaseModel):
     title: Optional[str] = None
     statement: Optional[str] = None
     difficulty: Optional[str] = None
+    best_time_complexity: Optional[str] = None
     time_limit_sec: Optional[float] = None
     memory_limit_kb: Optional[int] = None
     is_visible: Optional[bool] = None
@@ -77,6 +79,7 @@ def admin_list_problems(
         {
             "id": p.id, "slug": p.slug, "title": p.title,
             "difficulty": p.difficulty, "is_visible": p.is_visible,
+            "best_time_complexity": getattr(p, "best_time_complexity", None) or "O(N)",
             "time_limit_sec": p.time_limit_sec, "memory_limit_kb": p.memory_limit_kb,
             "test_case_count": session.exec(
                 select(TestCase).where(TestCase.problem_id == p.id)
@@ -377,6 +380,7 @@ def admin_get_batch_problems(
             "slug": p.slug,
             "title": p.title,
             "difficulty": p.difficulty,
+            "best_time_complexity": getattr(p, "best_time_complexity", None) or "O(N)",
             "is_assigned": p.id in assigned_set,
         }
         for p in all_problems
@@ -448,4 +452,38 @@ def admin_auto_allot_problems(
     return {
         "message": "Questions successfully allotted across batches",
         "batches": summary,
+    }
+
+
+class BatchCreate(BaseModel):
+    batch_number: int
+    name: str
+    duration_minutes: int = 60
+
+
+@router.post("/batches", status_code=status.HTTP_201_CREATED)
+def admin_create_batch(
+    body: BatchCreate,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> Dict[str, Any]:
+    exists = session.exec(select(Batch).where(Batch.batch_number == body.batch_number)).first()
+    if exists:
+        raise HTTPException(status_code=400, detail=f"Batch number {body.batch_number} already exists")
+    batch = Batch(
+        batch_number=body.batch_number,
+        name=body.name,
+        duration_minutes=body.duration_minutes,
+        status="NOT_STARTED",
+    )
+    session.add(batch)
+    session.commit()
+    session.refresh(batch)
+    return {
+        "id": batch.id,
+        "batch_number": batch.batch_number,
+        "name": batch.name,
+        "duration_minutes": batch.duration_minutes,
+        "status": batch.status,
+        "message": "Batch created successfully",
     }
