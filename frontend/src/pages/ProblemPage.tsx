@@ -15,6 +15,7 @@ import { loadDraft, saveDraft, clearDraft } from '../lib/drafts';
 import Balloon from '../components/Balloon';
 import Difficulty from '../components/Difficulty';
 import Icon from '../components/Icon';
+import { useExamSecurity } from '../ExamSecurity';
 
 const LANGUAGES = [
   { id: 'python', label: 'Python 3.8', ext: 'py' },
@@ -375,6 +376,11 @@ export default function ProblemPage() {
 
   const { addToast } = useToast();
   const { user } = useAuth();
+  // Exam security (copy/paste blocking, strikes, lock) is enforced app-wide by
+  // ExamSecurityProvider; here we only disable Monaco's own clipboard menu / drop for
+  // contestants and freeze the editor once the server has locked the attempt.
+  const isContestant = user?.role === 'contestant';
+  const { locked: securityLocked } = useExamSecurity();
   // An admin's submission list spans every team, so solved balloons are contestant-only.
   const { problems, allProblems, status } = useArena(user?.role !== 'admin');
 
@@ -548,13 +554,13 @@ export default function ProblemPage() {
   // allProblems, not problems: the quest you're on is hidden from the list once submitted,
   // but its title balloon should keep showing while you read the verdict.
   const current = allProblems.find((p) => p.slug === problem.slug);
-  const editorLocked = isContestEnded || sealed;
+  const editorLocked = isContestEnded || sealed || securityLocked;
   const ext = LANGUAGES.find((l) => l.id === lang)?.ext ?? 'txt';
   const verdict = lastResult?.verdict || 'IE';
   const hasCompileOutput = verdict === 'CE' && !!lastResult?.compile_error;
 
   return (
-    <div className="workspace" data-pane={pane}>
+    <div className={`workspace${isContestant ? ' exam-protected' : ''}`} data-pane={pane}>
       {/* Sanchita: unclosable modal when contest has ended */}
       {isContestEnded && <BattleFinishedModal />}
 
@@ -771,6 +777,10 @@ export default function ProblemPage() {
                 automaticLayout: true,
                 // Sanchita: lock editor when contest has ended; also sealed once the one submission is used
                 readOnly: editorLocked,
+                // Exam security: hide Monaco's Cut/Copy/Paste menu and file/text drop for contestants
+                contextmenu: !isContestant,
+                dropIntoEditor: { enabled: !isContestant },
+                dragAndDrop: !isContestant,
               }}
             />
           </div>

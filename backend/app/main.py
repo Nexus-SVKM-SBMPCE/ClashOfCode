@@ -13,7 +13,7 @@ from app.models import get_session
 from sqlmodel import Session
 from app.models import engine
 
-from app.routers import auth, problems, submissions, leaderboard, admin, batches
+from app.routers import auth, problems, submissions, leaderboard, admin, batches, security
 
 # ---------------------------------------------------------------------------
 # App bootstrap
@@ -39,6 +39,7 @@ app.include_router(submissions.router)
 app.include_router(leaderboard.router)
 app.include_router(admin.router)
 app.include_router(batches.router)
+app.include_router(security.router)
 
 
 @app.on_event("startup")

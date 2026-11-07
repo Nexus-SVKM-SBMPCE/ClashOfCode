@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import { ToastProvider } from './Toast';
+import { ExamSecurityProvider } from './ExamSecurity';
 import Navbar from './Navbar';
 import BatchGate from './BatchGate';
 import LoginPage from './pages/LoginPage';
@@ -79,7 +80,10 @@ export default function App() {
     <BrowserRouter>
       <ToastProvider>
         <AuthProvider>
-          <AppLayout />
+          {/* Exam security notice + tab-switch monitoring (contestants only) */}
+          <ExamSecurityProvider>
+            <AppLayout />
+          </ExamSecurityProvider>
         </AuthProvider>
       </ToastProvider>
     </BrowserRouter>

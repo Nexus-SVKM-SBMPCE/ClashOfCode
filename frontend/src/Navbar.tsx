@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { demoMode } from './api';
 import { useCountdownTimer } from './useCountdownTimer';
 import LiveSubmissionCounter from './LiveSubmissionCounter';
+import { useExamSecurity } from './ExamSecurity';
 import Icon from './components/Icon';
 
 // ─── Timer display component ──────────────────────────────────────────────────
@@ -57,6 +58,24 @@ function BatchTimer() {
   );
 }
 
+// ─── Violation counter (contestants, while the exam is live or locked) ───────
+function ViolationPill() {
+  const { monitoring, violations, maxStrikes, locked } = useExamSecurity();
+  if (violations == null || (!monitoring && !locked && violations === 0)) return null;
+  const tone = locked ? ' tab-switch-pill--locked' : violations > 0 ? ' tab-switch-pill--flagged' : '';
+  return (
+    <div className={`tab-switch-pill${tone}`} role="status"
+      title="Security violations on your attempt — visible to the administrator. 3 locks your session."
+      aria-label={locked ? 'Contest session locked' : `Violations: ${violations} of ${maxStrikes}`}>
+      <span aria-hidden="true">{locked ? '🔒' : '🛡'}</span>
+      <span>
+        <span className="tab-switch-label">{locked ? 'Locked · ' : 'Violations: '}</span>
+        {Math.min(violations, maxStrikes)} / {maxStrikes}
+      </span>
+    </div>
+  );
+}
+
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 export default function Navbar() {
   const { user, signOut } = useAuth();
@@ -95,6 +114,8 @@ export default function Navbar() {
 
         {/* Live submission counter sits right beside the timer */}
         <LiveSubmissionCounter />
+
+        <ViolationPill />
 
         <button
           type="button"
