@@ -24,6 +24,12 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    // Request fullscreen upon user gesture for automatic arena entry
+    if (typeof document !== 'undefined' && document.documentElement?.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+
     try {
       await signIn(username, password);
     } catch {

@@ -3,7 +3,7 @@
  *
  * Renders `children` normally if:
  *   - the current user is an admin (admins always bypass)
- *   - the batch status is ACTIVE or COMPLETED
+ *   - the batch status is ACTIVE or COMPLETED (wrapped in FullscreenGate for contestants)
  *
  * Renders <WaitingScreen /> if:
  *   - the batch status is NOT_STARTED
@@ -16,6 +16,7 @@ import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { useCountdownTimer } from './useCountdownTimer';
 import WaitingScreen from './WaitingScreen';
+import FullscreenGate from './components/FullscreenGate';
 
 interface BatchGateProps {
   children: ReactNode;
@@ -39,7 +40,7 @@ export default function BatchGate({ children }: BatchGateProps) {
     setBatchOpened(true);
   }, []);
 
-  // Admins always see content
+  // Admins always see content directly without gating
   if (user?.role === 'admin') {
     return <>{children}</>;
   }
@@ -51,7 +52,7 @@ export default function BatchGate({ children }: BatchGateProps) {
 
   // Batch has been confirmed active at some point this session (and is not NOT_STARTED)
   if (batchOpened) {
-    return <>{children}</>;
+    return <FullscreenGate>{children}</FullscreenGate>;
   }
 
   // Timer is still loading — show a minimal non-distracting spinner
@@ -64,9 +65,9 @@ export default function BatchGate({ children }: BatchGateProps) {
     );
   }
 
-  // Batch is confirmed ACTIVE or COMPLETED — let through
+  // Batch is confirmed ACTIVE or COMPLETED — let through into FullscreenGate
   if (status === 'ACTIVE' || status === 'COMPLETED') {
-    return <>{children}</>;
+    return <FullscreenGate>{children}</FullscreenGate>;
   }
 
   // Covers: error (fail-closed for security)

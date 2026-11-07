@@ -223,6 +223,23 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Dynamic Session Refresh: `_assert_batch_active` and `get_my_batch_timer` call `session.refresh(batch)` to prevent stale identity-map reads from WAL SQLite.
   - [x] Optimistic Admin UX: 'Start Batch Timer' button in `LeaderboardPage.tsx` features an optimistic loading state (`Starting…` + spinner), 8-second network timeout guard, rollback on failure, and guaranteed button unlock in `finally`.
   - [x] Verified: 4/4 backend tests pass (`pytest`), 44/44 frontend tests pass (`vitest run`), and `npm run build` exits 0 with 0 TS errors.
+- [x] **Contest Anti-Cheat — Task 1: Fullscreen Lock & Exit Counter** *(Phase 6 — COMPLETE)*:
+  - [x] Created `frontend/src/hooks/useFullscreenLock.ts`: tracks `isFullscreen`, `exitCount` (persisted in `sessionStorage` key `'coc_fullscreen_exit_count'`), and `enterFullscreen` via `document.documentElement.requestFullscreen()`.
+  - [x] Fullscreen Exit Detection & Event Dispatch: listens to document `fullscreenchange`; when `document.fullscreenElement` drops to null after having been active, increments `exitCount`, saves count to `sessionStorage`, and dispatches window `contest:violation` event (`{ type: 'fullscreen_exit', count: updatedCount }`). Includes complete cleanup on unmount.
+  - [x] Created `frontend/src/components/FullscreenGate.tsx`:
+    - Admin bypass: immediately renders children without gating when `user.role === 'admin'`.
+    - Active Fullscreen: renders contest content without restrictions when fullscreen is active.
+    - Blocking Modal Overlay: blocks all contest interactions outside fullscreen.
+      - State A (`exitCount === 0`): "Contest Arena - Fullscreen Required" modal prompting participant to enter fullscreen ("Enter Fullscreen Arena").
+      - State B (`exitCount > 0`): "War Alert: Fullscreen Violation" warning displaying violation count badge and mandatory re-entry button ("Return to Fullscreen").
+  - [x] Integrated into `frontend/src/BatchGate.tsx`: active contestant problem routes (`/problems` and `/problems/:slug`) are wrapped with `<FullscreenGate>`, ensuring problems and the Monaco code editor remain locked behind fullscreen mode.
+  - [x] Enhanced `frontend/src/pages/LoginPage.tsx`: triggers `document.documentElement.requestFullscreen().catch(() => {})` directly inside the user's "Enter the Arena" submit button gesture for seamless auto-entry into fullscreen on login.
+  - [x] Themed modal & badge styling in `frontend/src/index.css`: `.fullscreen-gate-overlay`, `.fullscreen-gate-card`, `.fullscreen-gate-card--violation`, `.modal-shield-wrap--violation`, `.fullscreen-violation-badge`, `.violation-dot`, `.gate-title`, and `.gate-message` styled to match the dark fantasy Clash of Code arena theme.
+  - [x] Test Coverage:
+    - `frontend/src/hooks/useFullscreenLock.test.ts` (6 unit tests: initial not-fullscreen state, session storage persistence, enter fullscreen request, fullscreen entry state change, exit increment + session update + event dispatch, and unmount listener cleanup).
+    - `frontend/src/components/FullscreenGate.test.tsx` (4 unit tests: admin bypass, contestant in fullscreen render, State A first-visit modal, State B violation warning modal).
+    - Mocked `FullscreenGate` in `BatchGate.test.tsx` for clean unit isolation.
+  - [x] Verified: 54/54 frontend tests pass (`npm test`), `npm run build` completes with 0 TS errors, and backend pytest suite passes.
 
 ### Vatsal's Tracker (`branch: vatsal`)
 - [x] **Live Submission Counter**:
