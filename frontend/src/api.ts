@@ -529,3 +529,122 @@ export const createAdminBatch = (data: { batch_number: number; name: string; dur
   return api.post<BatchAdminInfo>('/api/admin/batches', data);
 };
 
+
+// ─── Exam security: tab-switch monitoring ────────────────────────────────────
+// The server owns the count (COUNT of stored events); the client only reports
+// "an event with this id happened" so retries never double-count.
+export interface TabSwitchStatus {
+  count: number;
+  recorded: boolean;
+}
+
+export interface TabSwitchSummary {
+  user_id: number;
+  username: string;
+  display_name: string;
+  batch_id: number | null;
+  count: number;
+  last_switch_at: string | null;
+}
+
+let mockTabSwitches = 0;
+
+export const reportTabSwitch = (eventId: string) => {
+  if (demoMode.enabled) return mockResp<TabSwitchStatus>({ count: ++mockTabSwitches, recorded: true });
+  return api.post<TabSwitchStatus>('/api/security/tab-switch', { event_id: eventId });
+};
+
+export const getMyTabSwitches = () => {
+  if (demoMode.enabled) return mockResp<TabSwitchStatus>({ count: mockTabSwitches, recorded: false });
+  return api.get<TabSwitchStatus>('/api/security/tab-switch');
+};
+
+export const getAdminTabSwitches = (batchId?: number) =>
+  api.get<TabSwitchSummary[]>('/api/admin/security/tab-switches', { params: batchId ? { batch_id: batchId } : {} });
+
+// ─── Exam security: three-strike violations ──────────────────────────────────
+// Server owns count + lock (per contestant per batch). The client only reports
+// "a violation of this type, with this unique id, happened".
+export type ViolationType = 'TAB_SWITCH' | 'FULLSCREEN_EXIT' | 'COPY_ATTEMPT' | 'CUT_ATTEMPT' | 'PASTE_ATTEMPT';
+
+export interface SecurityStatus {
+  count: number;
+  max_strikes: number;
+  locked: boolean;
+  recorded: boolean;
+  contest_live: boolean;
+  batch_id: number | null;
+  reason?: string | null;
+}
+
+export interface SecurityParticipant {
+  user_id: number;
+  username: string;
+  display_name: string;
+  team_name: string | null;
+  batch_id: number | null;
+  batch_name: string | null;
+  total_violations: number;
+  tab_switches: number;
+  fullscreen_exits: number;
+  copy_paste_attempts: number;
+  lifetime_violations: number;
+  status: 'ACTIVE' | 'LOCKED';
+  locked_at: string | null;
+  last_violation_at: string | null;
+}
+
+export interface SecurityIncident {
+  id: number;
+  event_type: ViolationType;
+  violation_number: number | null;
+  created_at: string | null;
+  voided: boolean;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface SecurityAdminActionInfo {
+  id: number;
+  action: 'UNLOCK' | 'RESET';
+  reason: string;
+  admin_username: string;
+  target_username: string;
+  batch_id: number | null;
+  created_at: string | null;
+}
+
+export interface SecurityIncidentHistory {
+  participant: SecurityParticipant;
+  events: SecurityIncident[];
+  actions: SecurityAdminActionInfo[];
+}
+
+let mockStrikes = 0;
+const mockStatus = (recorded: boolean): SecurityStatus => ({
+  count: mockStrikes, max_strikes: 3, locked: mockStrikes >= 3, recorded, contest_live: true, batch_id: 1,
+});
+
+export const reportViolation = (eventId: string, eventType: ViolationType, metadata?: Record<string, string>) => {
+  if (demoMode.enabled) {
+    if (mockStrikes < 3) mockStrikes += 1;
+    return mockResp(mockStatus(true));
+  }
+  return api.post<SecurityStatus>('/api/security/violations', { event_id: eventId, event_type: eventType, metadata });
+};
+
+export const getSecurityStatus = () => {
+  if (demoMode.enabled) return mockResp(mockStatus(false));
+  return api.get<SecurityStatus>('/api/security/status');
+};
+
+export const getSecurityParticipants = (batchId?: number) =>
+  api.get<SecurityParticipant[]>('/api/admin/security/participants', { params: batchId ? { batch_id: batchId } : {} });
+
+export const getSecurityIncidents = (userId: number, batchId?: number | null) =>
+  api.get<SecurityIncidentHistory>(`/api/admin/security/participants/${userId}/events`, { params: batchId ? { batch_id: batchId } : {} });
+
+export const unlockParticipant = (userId: number, reason: string, batchId?: number | null) =>
+  api.post<SecurityIncidentHistory>(`/api/admin/security/participants/${userId}/unlock`, { reason, batch_id: batchId ?? null });
+
+export const resetParticipantViolations = (userId: number, reason: string, batchId?: number | null) =>
+  api.post<SecurityIncidentHistory>(`/api/admin/security/participants/${userId}/reset`, { reason, batch_id: batchId ?? null });

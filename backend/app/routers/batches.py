@@ -109,6 +109,18 @@ def get_my_batch_timer(
     the client MUST use it — never the browser's local clock.
     """
     now = _utc_now()
+    batch = resolve_user_batch(session, current_user)
+    if batch is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No batch found. Admin must create a batch first.",
+        )
+    return _batch_to_timer_response(batch, now)
+
+
+def resolve_user_batch(session: Session, current_user: User) -> Optional[Batch]:
+    """Return the batch a user competes in: their team's batch, else the active
+    batch, else the earliest batch. Shared by the timer and exam-security routes."""
     batch = None
 
     # Check if contestant is part of a team with an assigned batch
@@ -128,12 +140,7 @@ def get_my_batch_timer(
         ).first()
     if batch is None:
         batch = session.exec(select(Batch).order_by(Batch.batch_number)).first()  # type: ignore[arg-type]
-    if batch is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No batch found. Admin must create a batch first.",
-        )
-    return _batch_to_timer_response(batch, now)
+    return batch
 
 
 # ---------------------------------------------------------------------------

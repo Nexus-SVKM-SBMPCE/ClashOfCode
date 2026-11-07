@@ -31,6 +31,7 @@ from app.models import (
     BATCH_STATUS_NOT_STARTED,
 )
 from app.scoring import compute_score
+from app.security_rules import ensure_not_locked
 from app.submission_rules import (
     ALREADY_SUBMITTED_CODE,
     ALREADY_SUBMITTED_MESSAGE,
@@ -195,6 +196,8 @@ def run_sample_submission(
 ) -> RunResponse:
     # 0. Validate batch deadline
     _validate_submission_deadline(session, current_user)
+    # 0b. Exam security: a locked attempt (3 strikes) cannot run code
+    ensure_not_locked(session, current_user)
 
     # Resolve problem
     prob = session.exec(
@@ -277,6 +280,8 @@ def create_submission(
 ) -> SubmissionResponse:
     # 0. Validate batch deadline
     batch = _validate_submission_deadline(session, current_user)
+    # 0b. Exam security: a locked attempt (3 strikes) cannot submit
+    ensure_not_locked(session, current_user)
 
     # Resolve problem
     prob = session.exec(

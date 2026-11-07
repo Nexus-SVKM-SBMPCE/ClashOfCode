@@ -4,6 +4,7 @@ Hidden test cases and reference solutions are never serialized to public API res
 """
 from datetime import datetime, timezone
 from typing import Optional, List
+from sqlalchemy import UniqueConstraint
 from sqlmodel import SQLModel, Field, Relationship, create_engine, Session
 from app.config import DATABASE_URL
 
@@ -59,6 +60,13 @@ _USER_COLUMNS = {
     "team_id": "INTEGER DEFAULT NULL",
 }
 
+_TAB_SWITCH_COLUMNS = {
+    "event_type": "VARCHAR(32) NOT NULL DEFAULT 'TAB_SWITCH'",
+    "violation_number": "INTEGER DEFAULT NULL",
+    "event_metadata": "VARCHAR(500) DEFAULT NULL",
+    "reset_id": "INTEGER DEFAULT NULL REFERENCES security_admin_actions(id)",
+}
+
 
 def _migrate_columns():
     from sqlalchemy import inspect, text
@@ -82,6 +90,14 @@ def _migrate_columns():
             for name, ddl in _USER_COLUMNS.items():
                 if name not in user_cols:
                     conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
+
+        if inspector.has_table("tab_switch_events"):
+            ev_cols = {c["name"] for c in inspector.get_columns("tab_switch_events")}
+            for name, ddl in _TAB_SWITCH_COLUMNS.items():
+                if name not in ev_cols:
+                    conn.execute(text(f"ALTER TABLE tab_switch_events ADD COLUMN {name} {ddl}"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_tab_switch_events_event_type ON tab_switch_events (event_type)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_tab_switch_events_reset_id ON tab_switch_events (reset_id)"))
 
         if not inspector.has_table("batch_problems"):
             conn.execute(text("""
@@ -148,7 +164,7 @@ class Problem(SQLModel, table=True):
     difficulty: str = Field(default="medium")   # "easy" | "medium" | "hard"
     time_limit_sec: float = Field(default=2.0)
     memory_limit_kb: int = Field(default=262144)
-    is_visible: bool = Field(default=True)
+    is_visible: bool = Field(default=True)
     best_time_complexity: Optional[str] = Field(default="O(N)", max_length=50)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -230,10 +246,67 @@ class Submission(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Per-question solve time for tie-breaking (seconds elapsed from batch start to first AC)
-    solve_time_seconds: Optional[int] = None    # NULL until the submission is AC
-    time_complexity: Optional[str] = None       # Real-time evaluated time complexity, e.g. O(N)
+    solve_time_seconds: Optional[int] = None    # NULL until the submission is AC
+    time_complexity: Optional[str] = None       # Real-time evaluated time complexity, e.g. O(N)
     time_complexity_verdict: Optional[str] = None  # OPTIMAL | ACCEPTABLE | SUBOPTIMAL
     batch_id: Optional[int] = Field(default=None, foreign_key="batches.id", index=True)
 
     user: Optional[User] = Relationship(back_populates="submissions")
     problem: Optional[Problem] = Relationship(back_populates="submissions")
+
+
+# ---------------------------------------------------------------------------
+# Exam security — violation log, per-attempt lock state, admin audit trail
+# ---------------------------------------------------------------------------
+VIOLATION_TYPES = ("TAB_SWITCH", "FULLSCREEN_EXIT", "COPY_ATTEMPT", "CUT_ATTEMPT", "PASTE_ATTEMPT")
+SECURITY_STATUS_ACTIVE = "ACTIVE"
+SECURITY_STATUS_LOCKED = "LOCKED"
+
+
+class TabSwitchEvent(SQLModel, table=True):
+    """One row per distinct security violation reported by a contestant's browser.
+
+    Historically tab switches only (hence the table name); `event_type` now covers
+    every VIOLATION_TYPES entry. The strike count is COUNT(*) of rows with
+    `reset_id IS NULL` — never a number the client claims. `client_event_id` plus
+    the unique constraint makes retries of the same event idempotent. An admin
+    reset never deletes rows: it stamps them with the audit row's id.
+    """
+    __tablename__ = "tab_switch_events"
+    __table_args__ = (UniqueConstraint("user_id", "client_event_id", name="uq_tab_switch_user_event"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    batch_id: Optional[int] = Field(default=None, foreign_key="batches.id", index=True)
+    client_event_id: str = Field(max_length=64)
+    event_type: str = Field(default="TAB_SWITCH", max_length=32, index=True)
+    violation_number: Optional[int] = None          # strike number at the time it was recorded
+    event_metadata: Optional[str] = Field(default=None, max_length=500)  # JSON, e.g. {"path": "/problems/x"}
+    reset_id: Optional[int] = Field(default=None, foreign_key="security_admin_actions.id", index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
+
+
+class ContestSecurityState(SQLModel, table=True):
+    """Lock state of one contestant's attempt (user + batch). Survives logout/login."""
+    __tablename__ = "contest_security_states"
+    __table_args__ = (UniqueConstraint("user_id", "batch_id", name="uq_security_state_user_batch"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    batch_id: int = Field(foreign_key="batches.id", index=True)
+    status: str = Field(default=SECURITY_STATUS_ACTIVE, max_length=16)   # ACTIVE | LOCKED
+    locked_at: Optional[datetime] = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class SecurityAdminAction(SQLModel, table=True):
+    """Audit trail: every admin UNLOCK / RESET with who, whom, when and why."""
+    __tablename__ = "security_admin_actions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    admin_id: int = Field(foreign_key="users.id", index=True)
+    target_user_id: int = Field(foreign_key="users.id", index=True)
+    batch_id: Optional[int] = Field(default=None, foreign_key="batches.id", index=True)
+    action: str = Field(max_length=16)               # UNLOCK | RESET
+    reason: str = Field(max_length=500)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
