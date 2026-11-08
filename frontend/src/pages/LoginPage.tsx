@@ -7,8 +7,8 @@ import Icon from '../components/Icon';
 import { balloonFor, letterFor } from '../lib/arena';
 
 const DEMO_ACCOUNTS = [
-  { username: 'admin', password: 'admin123' },
-  { username: 'contestant1', password: 'pass123' },
+  // { username: 'admin', password: 'admin123' },
+  // { username: 'contestant1', password: 'pass123' },
 ];
 
 export default function LoginPage() {
