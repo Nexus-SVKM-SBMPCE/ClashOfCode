@@ -1,4 +1,4 @@
-﻿"""
+"""
 SQLModel database models and engine configuration.
 Hidden test cases and reference solutions are never serialized to public API responses.
 """
