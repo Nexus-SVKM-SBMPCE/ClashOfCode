@@ -6,7 +6,7 @@ import Balloon from '../components/Balloon';
 import Icon from '../components/Icon';
 import { balloonFor, letterFor } from '../lib/arena';
 
-const DEMO_ACCOUNTS = [
+const DEMO_ACCOUNTS: { username: string; password: string }[] = [
   // { username: 'admin', password: 'admin123' },
   // { username: 'contestant1', password: 'pass123' },
 ];

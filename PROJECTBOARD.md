@@ -316,6 +316,63 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - Problem letters (A–E) are computed from the visible list, so they can shift on reload once a quest is submitted (cosmetic)
   - Pre-existing, not from this work: Monaco is a controlled editor and drops characters under machine-speed typing (reproduced on the untouched `main` too). Real typing speed is fine; worth a look if teams report lost keystrokes
 
+#### Vatsal — Round 3 (2026-11-07): Exam security
+- [x] **Security notice on login**: contestants entering `/problems` get a blocking "Examination Security Guidelines" dialog (copy-paste rules + tab monitoring), must press "I Understand & Continue". Once per login (sessionStorage, cleared on sign-out). Admins never see it. (`src/ExamSecurity.tsx`, `components/ExamSecurityDialogs.tsx`)
+- [x] **Block copy / cut / paste** (`hooks/useCopyPasteGuard.ts`): Ctrl/Cmd+C/X/V, Ctrl+Insert, Shift+Insert, Shift+Delete, copy/cut/paste/drop/dragstart/contextmenu and `beforeinput` paste — capture-phase listeners scoped to the ProblemPage workspace only, contestants only. Monaco context menu + drop-into-editor off for contestants; statement text unselectable. One "disabled" toast per burst. Login/admin/other pages untouched
+- [x] **Tab-switch counter + warning** (`hooks/useTabSwitchMonitor.ts`): Page Visibility API only (blur not counted → no double counting); active only when notice acknowledged + batch `ACTIVE` + on `/problems*`; stops on `COMPLETED` / sign-out. Warning dialog on return (1st vs. later wording), live "👁 Tab Switches: N" pill in the navbar. Count survives refresh/route changes
+- [x] **Backend** (`app/routers/security.py`, new table `tab_switch_events` with unique `(user_id, client_event_id)`): `POST /api/security/tab-switch {event_id}` → server-side COUNT (client count ignored, retries de-duplicated, only recorded while the batch is live, admins ignored); `GET /api/security/tab-switch` (own count); `GET /api/admin/security/tab-switches?batch_id=` (admin only, 403 otherwise). `resolve_user_batch()` extracted from the timer route (behaviour unchanged) and reused
+- [x] **Tests**: frontend `npm test` → 8 files / 63 pass (new `ExamSecurity.test.tsx`, 21 cases); `npm run build` exit 0; backend `tests/test_exam_security.py` (local, `tests/` is git-ignored) → 9 pass incl. timer regression
+- [x] ~~PENDING — admin UI~~ → done in Round 4 (Security Watch tab)
+
+#### Vatsal — Round 4 (2026-11-07): Three-strike enforcement, fullscreen, post-login notice
+- [x] **Notice right after login** (any route, contestants only, never admins / logged-out): lists what is NOT allowed (copy/cut/paste, tab/window switching, leaving fullscreen, outside help) + the three-strike rule. Button is disabled with a visible countdown for **10 s**; Escape/backdrop cannot close it. "I Understand & Continue" also enters fullscreen
+- [x] **Enforcement lifecycle** (`src/ExamSecurity.tsx`): active only when notice acknowledged + batch `ACTIVE` + on `/problems*`. Copy guard moved from ProblemPage to the app shell (attached to `document.body` only while enforcing). Nothing before login, on `/login`, for admins, before start or after end
+- [x] **Unified violations** (`hooks/useSecurityMonitor.ts`): TAB_SWITCH, FULLSCREEN_EXIT, COPY/CUT/PASTE_ATTEMPT. One action = one strike: 1.5 s client window + 2 s server window + unique event id; held keys report once; refresh/unload never counts; network failures are queued with their id and re-sent (server de-dupes)
+- [x] **Warnings**: "Security Warning" 1/3, "Final Warning" 2/3, "Contest Session Locked" 3/3 (exact copy from spec), strike meter, navbar pill `🛡 Violations n / 3` / `🔒 Locked`
+- [x] **Fullscreen**: requested on acknowledgement; exit = 1 strike; "Fullscreen Required" screen (with denial message) whenever enforcing and not fullscreen, e.g. after a refresh (not a strike)
+- [x] **Backend lock** (`app/security_rules.py`): count/lock per (contestant, batch) in DB — survives refresh, logout/login, other browsers. 3rd strike → `contest_security_states.status = LOCKED`; `POST /api/submissions` and `/run` return **423 `SESSION_LOCKED`**. Nothing deleted (drafts stay in the browser, submissions in DB). Account is not disabled
+- [x] **Schema**: `tab_switch_events` + `event_type`, `violation_number`, `event_metadata`, `reset_id` (in-place migration, old rows default `TAB_SWITCH`); new `contest_security_states`, `security_admin_actions` (audit). New endpoints: `POST /api/security/violations`, `GET /api/security/status`, admin `GET /api/admin/security/participants`, `GET …/{id}/events`, `POST …/{id}/unlock`, `POST …/{id}/reset`, `GET /api/admin/security/audit` (all `require_admin`). Legacy `/tab-switch` endpoints kept
+- [x] **Admin "🛡 Security Watch" tab** (`components/SecurityMonitorPanel.tsx`): per team — batch, strikes, tab / fullscreen / copy-paste counts, status, last violation; incident history; **Unlock (keep strikes)** / **Reset strikes & unlock** with mandatory reason; audit shows admin + reason. Resets void events, never delete
+- [x] **Tests**: frontend `npm test` → 8 files / **71 pass** (`ExamSecurity.test.tsx` 29 cases); `npm run build` exit 0; backend `tests/test_exam_security.py` → **17 pass** (lock + 423, retries, same-incident, re-login, not-live, separate attempts, admin-only, unlock/reset audit, migration, timer regression)
+- [x] **Live UAT (2026-11-07, real browser vs real backend, Docker/Judge0 up)**: notice shows right after `team1` login with the full "not allowed" list → acknowledge enters fullscreen → paste blocked = strike 1 "Security Warning 1/3" → tab hidden = strike 2 "Final Warning 2/3" (stored as `TAB_SWITCH`) → `contestant1` reached 3 strikes and was locked (later tab switches correctly ignored while locked)
+- [x] **Bug found in UAT + fixed**: the "page is unloading" guard (so a refresh is not a strike) never cleared, so after a cancelled navigation / back-forward-cache restore every later tab switch was ignored. Now resets after 1 s or on `pageshow` (regression test added)
+- [ ] **Still to do by hand**: a genuine Ctrl+Tab / Alt+Tab / minimise in Chrome + Edge (automation opens pages in separate windows, so the hidden signal was triggered by script), Esc out of fullscreen, admin unlock from the UI, phone layout
+- Notes: after an admin starts a batch, an already-open contestant page needs up to 30 s (existing timer poll) or a refresh before enforcement starts. Use separate browsers for admin and team (same profile shares one login token). Judge0 code execution needs cgroup v1 on WSL2 (unrelated to this work). Test environment (Judge0 containers + volumes, local venv, test DB, `.env`, build output) was removed after testing
+
+#### Exam security — test results (final run, 2026-11-07)
+| Suite | Command | Result |
+| :--- | :--- | :--- |
+| Frontend unit/integration | `cd frontend && npm test` | **8 files / 72 tests pass** (3 consecutive runs) — incl. `ExamSecurity.test.tsx` (30 cases) |
+| Frontend build + types | `cd frontend && npm run build` | exit 0, 0 TS errors |
+| Frontend lint (touched files) | `npx oxlint …` | 0 errors (only the same warning types already present in the repo) |
+| Backend API | `pytest tests/test_exam_security.py` | **17 pass** — lock + 423 on Run/Submit, retry de-dupe, same-incident window, re-login, contest not live, separate attempts, admin-only (403), unlock/reset audit, old-DB migration, timer regression. Scratch file, deleted after the run (repo `.gitignore` excludes `tests/`) |
+| Live UAT | browser + uvicorn + Vite + Judge0 containers | see Live UAT above |
+
+#### Exam security — every file changed and why
+| File | Change | Why / what changed |
+| :--- | :--- | :--- |
+| `backend/app/models.py` | Modified | `tab_switch_events` (`TabSwitchEvent`) gains `event_type`, `violation_number`, `event_metadata`, `reset_id`; new tables `contest_security_states` (lock per contestant + batch) and `security_admin_actions` (audit trail); in-place `ALTER TABLE` migration for existing DBs |
+| `backend/app/security_rules.py` | **New** | All three-strike logic: server-side count, 2 s same-incident window, event-id de-dupe, process lock so two requests can't both be strike 3, lock on strike 3, `ensure_not_locked()` (HTTP 423 `SESSION_LOCKED`) |
+| `backend/app/routers/security.py` | **New** | Contestant: `POST /api/security/violations`, `GET /api/security/status`, legacy `/api/security/tab-switch`. Admin (`require_admin`): participants summary, incident history, unlock, reset (reason required, audited), audit log, legacy tab-switch report |
+| `backend/app/routers/batches.py` | Modified | Extracted `resolve_user_batch()` from the timer endpoint (behaviour unchanged, regression-tested) so security code finds a contestant's batch the same way |
+| `backend/app/routers/submissions.py` | Modified | `ensure_not_locked()` before Run and Submit → locked attempts get 423; unlocked users unaffected |
+| `backend/app/main.py` | Modified | Registers the new security router |
+| `frontend/src/ExamSecurity.tsx` | **New** | App-wide provider: notice right after a contestant logs in (never admins / logged-out); enforces only when acknowledged + batch ACTIVE + on `/problems*`; wires copy guard, strike warnings, lock screen, fullscreen requirement; exposes state to Navbar / ProblemPage |
+| `frontend/src/components/ExamSecurityDialogs.tsx` | **New** | Security notice (not-allowed list, button disabled with a 10 s countdown, Esc blocked), Security Warning 1/3, Final Warning 2/3, Contest Session Locked 3/3, Fullscreen Required — reuse the existing BattleFinished modal styling, focus kept inside |
+| `frontend/src/components/SecurityMonitorPanel.tsx` | **New** | Admin "🛡 Security Watch": per-team strikes / tab / fullscreen / copy-paste counts, status, last violation, incident history, Unlock / Reset with mandatory reason + audit list |
+| `frontend/src/hooks/useCopyPasteGuard.ts` | **New** | Blocks Ctrl/⌘+C/X/V, Ctrl/Shift+Insert, Shift+Delete, copy/cut/paste/drop/drag/right-click; held keys report once; listeners removed when inactive |
+| `frontend/src/hooks/useSecurityMonitor.ts` | **New** | Detects tab hidden + fullscreen exit, reports copy attempts; 1.5 s same-action window; refresh never counts (with the UAT fix); offline queue re-sends with the same event id; polls while locked so an admin unlock applies without reload |
+| `frontend/src/lib/examSecurity.ts` | **New** | Notice acknowledgement (sessionStorage, cleared on sign-out), pending-report queue, exact warning texts, fullscreen helpers |
+| `frontend/src/api.ts` | Modified | Types + calls for violations, status and admin security endpoints (demo-mode mocks included) |
+| `frontend/src/App.tsx` | Modified | Wraps the app in `ExamSecurityProvider` |
+| `frontend/src/AuthContext.tsx` | Modified | Sign-out clears the notice acknowledgement (strikes stay on the server) |
+| `frontend/src/Navbar.tsx` | Modified | `🛡 Violations n / 3` / `🔒 Locked` pill next to the timer |
+| `frontend/src/pages/ProblemPage.tsx` | Modified | Editor + Run/Submit frozen when locked; Monaco's own right-click menu and drag-drop disabled for contestants (blocking itself moved app-wide) |
+| `frontend/src/pages/LeaderboardPage.tsx` | Modified | New admin tab "🛡 Security Watch" |
+| `frontend/src/index.css` | Modified | Styles for notice, strike meter, lock screen, navbar pill, admin panel (existing theme tokens) |
+| `frontend/src/ExamSecurity.test.tsx` | **New** | 30 tests: guard, strike 1→2→3, one action = one strike, refresh / cancelled unload, offline retry, notice 10 s lock, admin/logged-out untouched, lock restore |
+| `PROJECTBOARD.md` | Modified | This tracking |
+
 #### Yash — Round 2 (2026-11-08)
 - [x] **Batch-Wise Allotment & Leakage Resolution**:
   - [x] Fixed `backend/app/routers/problems.py` (`list_problems` & `get_problem`) to strictly enforce batch boundaries when batch problems are configured. Solves empty/unallotted fallback bug where all questions leaked to every batch.

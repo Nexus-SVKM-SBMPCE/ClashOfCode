@@ -113,6 +113,21 @@ def get_my_batch_timer(
     if response is not None:
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     now = _utc_now()
+    batch = resolve_user_batch(session, current_user, batch_id=batch_id)
+    if batch is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No batch found. Admin must create a batch first.",
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+        )
+    # Refresh to ensure latest status committed across transactions
+    session.refresh(batch)
+    return _batch_to_timer_response(batch, now)
+
+
+def resolve_user_batch(session: Session, current_user: User, batch_id: Optional[int] = None) -> Optional[Batch]:
+    """Return the batch a user competes in: their team's batch, else the active
+    batch, else the earliest batch. Shared by the timer and exam-security routes."""
     batch = None
 
     if current_user.role == "admin" and batch_id is not None:
@@ -136,15 +151,7 @@ def get_my_batch_timer(
     # Fallback to earliest batch if no team/batch allotment
     if batch is None:
         batch = session.exec(select(Batch).order_by(Batch.batch_number)).first()  # type: ignore[arg-type]
-    if batch is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No batch found. Admin must create a batch first.",
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
-        )
-    # Refresh to ensure latest status committed across transactions
-    session.refresh(batch)
-    return _batch_to_timer_response(batch, now)
+    return batch
 
 
 # ---------------------------------------------------------------------------

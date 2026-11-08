@@ -1837,3 +1837,71 @@ kbd { font-size: 10px; padding: 0 4px; border-radius: 3px; border: 1px solid var
   font-size: 13px;
   color: var(--text-2);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EXAM SECURITY — notice / tab-switch warning / navbar counter / copy guard
+   Dialogs reuse the .battle-finished-modal shell above.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.exam-security-modal { max-width: 520px; max-height: calc(100dvh - 48px); overflow-y: auto; user-select: text; }
+.exam-security-modal .modal-shield-icon { line-height: 1; }
+.exam-security-modal .btn { width: 100%; justify-content: center; }
+.exam-security-rules {
+  list-style: decimal; text-align: left; margin: 0 0 16px; padding: 14px 16px 14px 36px;
+  background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 12px;
+  display: grid; gap: 10px; font-size: 13.5px; line-height: 1.5; color: var(--text-2);
+}
+.exam-security-rules b { display: block; color: var(--text); font-weight: 700; }
+
+.tab-switch-pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px;
+  border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface-2);
+  color: var(--text-2); font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+.tab-switch-pill--flagged { border-color: rgba(239, 68, 68, 0.5); background: rgba(239, 68, 68, 0.12); color: #f87171; }
+.tab-switch-pill--locked { border-color: #ef4444; background: rgba(239, 68, 68, 0.22); color: #fecaca; }
+
+/* Security dialogs sit above BattleFinishedModal (same z-index family) */
+.exam-security-overlay { z-index: 10000; }
+.exam-security-modal:focus { outline: none; }
+.exam-security-modal--danger { border-color: rgba(239, 68, 68, 0.6); box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85), 0 0 32px rgba(239, 68, 68, 0.25); }
+.exam-security-modal--danger .modal-title { color: #f87171; text-shadow: 0 0 16px rgba(239, 68, 68, 0.3); }
+.exam-security-subhead { margin: 4px 0 8px; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--gold); }
+.exam-security-rules--deny { list-style: none; padding-left: 16px; background: rgba(239, 68, 68, 0.07); border-color: rgba(239, 68, 68, 0.3); }
+.exam-security-hint { margin: 10px 0 0; font-size: 12.5px; color: var(--text-2); }
+.exam-security-error { color: #f87171; }
+.exam-security-badge { margin-bottom: 18px; }
+.exam-strike-meter { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 20px; }
+.exam-strike-pips { display: flex; gap: 8px; }
+.exam-strike-pips span { width: 34px; height: 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line-strong); }
+.exam-strike-pips span.is-hit { background: #ef4444; border-color: #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.6); }
+.exam-strike-text { font-size: 13px; font-weight: 800; color: var(--text); letter-spacing: 0.3px; }
+
+/* Statement text cannot be selected (Monaco keeps its own selection for editing) */
+.exam-protected .pane-statement { -webkit-user-select: none; user-select: none; }
+
+@media (max-width: 640px) {
+  .battle-finished-modal.exam-security-modal { padding: 24px 18px; }
+  .tab-switch-label { display: none; }
+}
+
+/* Admin: Security Watch */
+.security-watch-summary { margin-left: auto; font-size: 12.5px; color: var(--text-2); }
+.security-watch-summary b { color: #f87171; }
+.security-table .num { text-align: center; }
+.security-sub { font-size: 11.5px; color: var(--text-2); font-weight: 500; }
+.security-empty { text-align: center; padding: 28px; color: var(--text-2); }
+.security-status { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 800; white-space: nowrap; border: 1px solid var(--line-strong); color: var(--text-2); }
+.security-status--locked { border-color: rgba(239, 68, 68, 0.6); background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.security-history { margin-top: 16px; padding: 18px 20px; }
+.security-history-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.security-history-head h3 { font-size: 15px; font-weight: 700; color: var(--gold-bright); }
+.security-history-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.security-history-grid h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--gold); margin-bottom: 8px; }
+.security-events { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.security-events li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface-2); }
+.security-events li.is-voided { opacity: 0.55; text-decoration: line-through; }
+.security-events time { margin-left: auto; font-size: 11.5px; color: var(--text-2); }
+.security-strike { font-weight: 800; color: var(--gold); min-width: 28px; }
+.security-reason { display: grid; gap: 6px; font-size: 12.5px; color: var(--text-2); margin-bottom: 10px; }
+.security-reason textarea { width: 100%; resize: vertical; }
+.security-actions { display: flex; gap: 8px; flex-wrap: wrap; }

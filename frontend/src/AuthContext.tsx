@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { type User, login as apiLogin, getMe } from './api';
+import { clearExamSecuritySession } from './lib/examSecurity';
 
 interface AuthCtx {
   user: User | null;
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('demo-user');
+    clearExamSecuritySession(); // next login sees the exam security notice again
     setUser(null);
   };
 

@@ -15,6 +15,7 @@ import {
   demoMode,
 } from '../api';
 import QuestForge from '../components/QuestForge';
+import SecurityMonitorPanel from '../components/SecurityMonitorPanel';
 import type { LeaderboardEntry, BatchAdminInfo, TeamAdminInfo, BatchProblemAdminInfo, TelemetryItem } from '../api';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../Toast';
@@ -24,7 +25,7 @@ export default function LeaderboardPage() {
   const { user } = useAuth();
   const { addToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'rankings' | 'allotment' | 'forge'>('rankings');
+  const [activeTab, setActiveTab] = useState<'rankings' | 'allotment' | 'forge' | 'security'>('rankings');
   const [board, setBoard] = useState<LeaderboardEntry[]>([]);
   const [batches, setBatches] = useState<BatchAdminInfo[]>([]);
   const [teams, setTeams] = useState<TeamAdminInfo[]>([]);
@@ -338,13 +339,21 @@ export default function LeaderboardPage() {
             >
               ⚒️ Quest Forge & Complexity
             </button>
+            <button
+              className={`btn btn-sm ${activeTab === 'security' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab('security')}
+            >
+              🛡 Security Watch
+            </button>
           </div>
         )}
 
         {demoMode.enabled && <div className="demo-note"><span className="demo-tag">Demo</span> Sample war standings, not real battle results.</div>}
         {error && <div className="inline-error" role="alert"><Icon name="alert" size={14} /> {error}</div>}
 
-        {activeTab === 'forge' ? (
+        {activeTab === 'security' ? (
+          <SecurityMonitorPanel batches={batches} />
+        ) : activeTab === 'forge' ? (
           <QuestForge />
         ) : activeTab === 'rankings' ? (
           <>
