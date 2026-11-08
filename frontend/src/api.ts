@@ -215,7 +215,9 @@ export const getMe = () => {
 // ─── Problems ─────────────────────────────────────────────────────────────────
 export const getProblems = () => {
   if (demoMode.enabled) return mockResp(MOCK_PROBLEMS as Problem[]);
-  return api.get<Problem[]>('/api/problems');
+  return api.get<Problem[]>('/api/problems', {
+    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+  });
 };
 
 export const getProblem = (slug: string) => {
@@ -224,7 +226,9 @@ export const getProblem = (slug: string) => {
     if (p) return mockResp(p as ProblemDetail);
     return mockResp(MOCK_PROBLEM_DETAIL['two-sum'] as ProblemDetail);
   }
-  return api.get<ProblemDetail>(`/api/problems/${slug}`);
+  return api.get<ProblemDetail>(`/api/problems/${slug}`, {
+    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+  });
 };
 
 // ─── Submissions ──────────────────────────────────────────────────────────────
@@ -326,12 +330,14 @@ export const getLeaderboard = (batch_id?: number) => {
   });
 };
 
+let mockAdminBatches: BatchAdminInfo[] = [
+  { id: 1, batch_number: 1, name: 'Batch 1', status: 'NOT_STARTED', timer_started_at: null, duration_minutes: 60, remaining_seconds: null, server_now_utc: new Date().toISOString() },
+  { id: 2, batch_number: 2, name: 'Batch 2', status: 'NOT_STARTED', timer_started_at: null, duration_minutes: 60, remaining_seconds: null, server_now_utc: new Date().toISOString() },
+];
+
 export const getAdminBatches = () => {
   if (demoMode.enabled) {
-    return mockResp<BatchAdminInfo[]>([
-      { id: 1, batch_number: 1, name: 'Batch 1', status: 'ACTIVE', timer_started_at: new Date().toISOString(), duration_minutes: 60, remaining_seconds: 3200, server_now_utc: new Date().toISOString() },
-      { id: 2, batch_number: 2, name: 'Batch 2', status: 'NOT_STARTED', timer_started_at: null, duration_minutes: 60, remaining_seconds: null, server_now_utc: new Date().toISOString() },
-    ]);
+    return mockResp<BatchAdminInfo[]>(mockAdminBatches);
   }
   return api.get<BatchAdminInfo[]>('/api/admin/batches');
 };
@@ -390,8 +396,59 @@ export const autoAllotBatchProblems = (problems_per_batch?: number) => {
   return api.post('/api/admin/batches/allot-problems', { problems_per_batch });
 };
 
+let mockBatchTimer: BatchTimerInfo = {
+  batch_id: 1,
+  batch_name: 'Batch 1 (Demo)',
+  status: 'NOT_STARTED',
+  timer_started_at: null,
+  duration_minutes: 60,
+  server_now_utc: new Date().toISOString(),
+  remaining_seconds: null,
+};
+
+export const resetBatchTimer = (batch_id: number) => {
+  if (demoMode.enabled) {
+    mockAdminBatches = mockAdminBatches.map((b) =>
+      b.id === batch_id
+        ? {
+            ...b,
+            status: 'NOT_STARTED',
+            timer_started_at: null,
+            remaining_seconds: null,
+          }
+        : b
+    );
+    mockBatchTimer = {
+      ...mockBatchTimer,
+      status: 'NOT_STARTED',
+      timer_started_at: null,
+      remaining_seconds: null,
+    };
+    return mockResp({ message: 'Reset', batch_id });
+  }
+  return api.post(`/api/admin/batches/${batch_id}/reset-timer`);
+};
+
 export const startBatchTimer = (batch_id: number) => {
-  if (demoMode.enabled) return mockResp({ message: 'Started', batch_id });
+  if (demoMode.enabled) {
+    mockAdminBatches = mockAdminBatches.map((b) =>
+      b.id === batch_id
+        ? {
+            ...b,
+            status: 'ACTIVE',
+            timer_started_at: new Date().toISOString(),
+            remaining_seconds: b.duration_minutes * 60,
+          }
+        : b
+    );
+    mockBatchTimer = {
+      ...mockBatchTimer,
+      status: 'ACTIVE',
+      timer_started_at: new Date().toISOString(),
+      remaining_seconds: mockBatchTimer.duration_minutes * 60,
+    };
+    return mockResp({ message: 'Started', batch_id });
+  }
   return api.post(`/api/admin/batches/${batch_id}/start-timer`);
 };
 
@@ -410,19 +467,17 @@ export interface BatchTimerInfo {
   remaining_seconds: number | null;
 }
 
-const MOCK_BATCH_TIMER: BatchTimerInfo = {
-  batch_id: 1,
-  batch_name: 'Batch 1 (Demo)',
-  status: 'ACTIVE',
-  timer_started_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // started 5 min ago
-  duration_minutes: 60,
-  server_now_utc: new Date().toISOString(),
-  remaining_seconds: 55 * 60, // 55 minutes left
-};
-
-export const getBatchTimer = () => {
-  if (demoMode.enabled) return mockResp(MOCK_BATCH_TIMER);
-  return api.get<BatchTimerInfo>('/api/batches/my-batch/timer');
+export const getBatchTimer = (batch_id?: number) => {
+  if (demoMode.enabled) {
+    return mockResp({
+      ...mockBatchTimer,
+      server_now_utc: new Date().toISOString(),
+    });
+  }
+  return api.get<BatchTimerInfo>('/api/batches/my-batch/timer', {
+    params: batch_id ? { batch_id } : {},
+    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+  });
 };
 
 
@@ -528,7 +583,6 @@ export const createAdminBatch = (data: { batch_number: number; name: string; dur
   }
   return api.post<BatchAdminInfo>('/api/admin/batches', data);
 };
-
 
 // ─── Exam security: tab-switch monitoring ────────────────────────────────────
 // The server owns the count (COUNT of stored events); the client only reports
@@ -648,3 +702,84 @@ export const unlockParticipant = (userId: number, reason: string, batchId?: numb
 
 export const resetParticipantViolations = (userId: number, reason: string, batchId?: number | null) =>
   api.post<SecurityIncidentHistory>(`/api/admin/security/participants/${userId}/reset`, { reason, batch_id: batchId ?? null });
+
+// ─── Contest Proctoring & Telemetry ───────────────────────────────────────────
+export interface TelemetryItem {
+  team_id: number;
+  team_name: string;
+  username: string;
+  leader_name: string;
+  leader_email: string;
+  batch_id: number | null;
+  batch_name: string;
+  total_score: number;
+  solved_count: number;
+  total_attacks: number;
+  fullscreen_exit_count: number;
+  tab_switch_count: number;
+  integrity_status: 'CLEAN' | 'CAUTION' | 'FLAGGED';
+  last_active_at: string | null;
+}
+
+export const reportTelemetry = (data: { event_type: 'tab_switch' | 'fullscreen_exit' | 'heartbeat'; count?: number }) => {
+  if (demoMode.enabled) {
+    return mockResp({ status: 'ok', ...data });
+  }
+  return api.post('/api/telemetry/report', data);
+};
+
+export const getAdminTelemetry = () => {
+  if (demoMode.enabled) {
+    return mockResp<TelemetryItem[]>([
+      {
+        team_id: 1,
+        team_name: 'Code Clan',
+        username: 'team1',
+        leader_name: 'Alice Chen',
+        leader_email: 'alice@clash.local',
+        batch_id: 1,
+        batch_name: 'Batch 1',
+        total_score: 500,
+        solved_count: 5,
+        total_attacks: 7,
+        fullscreen_exit_count: 0,
+        tab_switch_count: 1,
+        integrity_status: 'CLEAN',
+        last_active_at: new Date().toISOString(),
+      },
+      {
+        team_id: 2,
+        team_name: 'Byte Brawlers',
+        username: 'team2',
+        leader_name: 'Bob Patel',
+        leader_email: 'bob@clash.local',
+        batch_id: 1,
+        batch_name: 'Batch 1',
+        total_score: 400,
+        solved_count: 4,
+        total_attacks: 6,
+        fullscreen_exit_count: 1,
+        tab_switch_count: 3,
+        integrity_status: 'CAUTION',
+        last_active_at: new Date().toISOString(),
+      },
+      {
+        team_id: 3,
+        team_name: 'Algo Assassins',
+        username: 'team3',
+        leader_name: 'Chloe Sharma',
+        leader_email: 'chloe@clash.local',
+        batch_id: 2,
+        batch_name: 'Batch 2',
+        total_score: 300,
+        solved_count: 3,
+        total_attacks: 5,
+        fullscreen_exit_count: 3,
+        tab_switch_count: 7,
+        integrity_status: 'FLAGGED',
+        last_active_at: new Date().toISOString(),
+      },
+    ]);
+  }
+  return api.get<TelemetryItem[]>('/api/telemetry/admin/discrete');
+};

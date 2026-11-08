@@ -14,6 +14,10 @@ vi.mock('./useCountdownTimer', () => ({
   useCountdownTimer: vi.fn(),
 }));
 
+vi.mock('./components/FullscreenGate', () => ({
+  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 describe('BatchGate Component', () => {
   const mockChildText = 'Protected Contest Problems Content';
 

@@ -6,6 +6,8 @@ import {
   assignTeamBatch,
   autoAllotBatches,
   startBatchTimer,
+  resetBatchTimer,
+  getAdminTelemetry,
   getBatchProblems,
   setBatchProblems,
   autoAllotBatchProblems,
@@ -14,7 +16,7 @@ import {
 } from '../api';
 import QuestForge from '../components/QuestForge';
 import SecurityMonitorPanel from '../components/SecurityMonitorPanel';
-import type { LeaderboardEntry, BatchAdminInfo, TeamAdminInfo, BatchProblemAdminInfo } from '../api';
+import type { LeaderboardEntry, BatchAdminInfo, TeamAdminInfo, BatchProblemAdminInfo, TelemetryItem } from '../api';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../Toast';
 import Icon from '../components/Icon';
@@ -27,11 +29,15 @@ export default function LeaderboardPage() {
   const [board, setBoard] = useState<LeaderboardEntry[]>([]);
   const [batches, setBatches] = useState<BatchAdminInfo[]>([]);
   const [teams, setTeams] = useState<TeamAdminInfo[]>([]);
+  const [telemetry, setTelemetry] = useState<TelemetryItem[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<number | undefined>(undefined);
+  const [dashboardView, setDashboardView] = useState<'combined' | 'standings' | 'telemetry'>('combined');
+  const [resettingBatchId, setResettingBatchId] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [startingBatchId, setStartingBatchId] = useState<number | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date>(() => new Date());
   const [error, setError] = useState<string | null>(null);
 
@@ -93,8 +99,11 @@ export default function LeaderboardPage() {
   }, []);
 
   const loadBatches = useCallback(() => {
-    getAdminBatches()
-      .then((r) => setBatches(r.data))
+    return getAdminBatches()
+      .then((r) => {
+        setBatches(r.data);
+        return r.data;
+      })
       .catch(() => {});
   }, []);
 
@@ -103,6 +112,27 @@ export default function LeaderboardPage() {
       .then((r) => setTeams(r.data))
       .catch(() => {});
   }, []);
+
+  const loadTelemetry = useCallback(() => {
+    if (user?.role !== 'admin') return;
+    getAdminTelemetry()
+      .then((r) => setTelemetry(r.data))
+      .catch(() => {});
+  }, [user]);
+
+  const handleResetTimer = async (batchId: number, batchName: string) => {
+    setResettingBatchId(batchId);
+    try {
+      await resetBatchTimer(batchId);
+      addToast(`🔄 Timer reset to NOT_STARTED for ${batchName}`, 'info');
+      window.dispatchEvent(new CustomEvent('batch:timer-reset', { detail: { batch_id: batchId } }));
+      await loadBatches();
+    } catch (err: any) {
+      addToast(err.response?.data?.detail || 'Failed to reset batch timer', 'error');
+    } finally {
+      setResettingBatchId(null);
+    }
+  };
 
   const loadBatchProblems = useCallback((batchId: number) => {
     getBatchProblems(batchId)
@@ -150,23 +180,34 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     refreshLeaderboard(selectedBatchId);
+    loadTelemetry();
     const interval = setInterval(() => {
       refreshLeaderboard(selectedBatchId);
+      loadTelemetry();
       if (activeTab === 'allotment') {
-        loadBatches();
         loadTeams();
       }
     }, 15000);
     return () => clearInterval(interval);
-  }, [refreshLeaderboard, selectedBatchId, activeTab, loadBatches, loadTeams]);
+  }, [refreshLeaderboard, selectedBatchId, activeTab, loadTeams]);
 
+  // Real-time 1-second batch polling for admin view to see the timer count down live
   useEffect(() => {
     if (activeTab === 'allotment') {
       loadBatches();
+      const interval = setInterval(() => {
+        loadBatches();
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [activeTab, loadBatches]);
+
+  useEffect(() => {
+    if (activeTab === 'allotment') {
       loadTeams();
       loadBatchProblems(selectedConfigBatchId);
     }
-  }, [activeTab, loadBatches, loadTeams, loadBatchProblems, selectedConfigBatchId]);
+  }, [activeTab, loadTeams, loadBatchProblems, selectedConfigBatchId]);
 
   const handleSelectBatch = (batchId?: number) => {
     setSelectedBatchId(batchId);
@@ -204,14 +245,39 @@ export default function LeaderboardPage() {
   };
 
   const handleStartTimer = async (batchId: number, batchName: string) => {
+    if (startingBatchId !== null) return;
+    setStartingBatchId(batchId);
     setActionLoading(true);
+
+    const prevBatches = [...batches];
+    // Optimistically reflect ACTIVE state immediately
+    setBatches((prev) =>
+      prev.map((b) =>
+        b.id === batchId
+          ? {
+              ...b,
+              status: 'ACTIVE',
+              timer_started_at: new Date().toISOString(),
+              remaining_seconds: b.duration_minutes * 60,
+            }
+          : b
+      )
+    );
+
     try {
-      await startBatchTimer(batchId);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Network request timed out. Please check server status.')), 8000)
+      );
+      await Promise.race([startBatchTimer(batchId), timeoutPromise]);
       addToast(`Countdown timer started for ${batchName}`, 'success');
-      loadBatches();
+      // Fetch authoritative updated batch state from backend
+      await loadBatches();
     } catch (err: any) {
-      addToast(err.response?.data?.detail || 'Failed to start timer for batch', 'error');
+      // Revert optimistic update on error or timeout
+      setBatches(prevBatches);
+      addToast(err.response?.data?.detail || err.message || 'Failed to start timer for batch', 'error');
     } finally {
+      setStartingBatchId(null);
       setActionLoading(false);
     }
   };
@@ -291,31 +357,112 @@ export default function LeaderboardPage() {
           <QuestForge />
         ) : activeTab === 'rankings' ? (
           <>
-            {/* Batch Filter Pills */}
-            <div className="batch-filter-bar">
-              <span className="batch-filter-label">Filter Batch:</span>
-              <button
-                className={`btn btn-sm ${selectedBatchId === undefined ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => handleSelectBatch(undefined)}
-              >
-                All Clans
-              </button>
-              {batches.map((b) => {
-                const isSelected = selectedBatchId === b.id;
-                const statusDot = b.status === 'ACTIVE' ? '🟢' : b.status === 'COMPLETED' ? '🏁' : '⏳';
-                return (
-                  <button
-                    key={b.id}
-                    className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => handleSelectBatch(b.id)}
-                  >
-                    {statusDot} {b.name}
-                  </button>
-                );
-              })}
+            {/* Event Overview Metrics (Live Command Center) */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+                gap: 14,
+                marginBottom: 20,
+              }}
+            >
+              <div className="panel" style={{ padding: '14px 18px', borderLeft: '4px solid var(--gold)' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase' }}>
+                  🛡️ Active Battle Clans
+                </span>
+                <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--gold-bright)', marginTop: 4 }}>
+                  {board.length} <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-2)' }}>clans</span>
+                </div>
+              </div>
+
+              <div className="panel" style={{ padding: '14px 18px', borderLeft: '4px solid var(--ac)' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase' }}>
+                  ⚔️ Total Victories (AC)
+                </span>
+                <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--ac)', marginTop: 4 }}>
+                  {board.reduce((acc, e) => acc + (e.solved_count || 0), 0)} <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-2)' }}>quests solved</span>
+                </div>
+              </div>
+
+              <div className="panel" style={{ padding: '14px 18px', borderLeft: '4px solid var(--pending)' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase' }}>
+                  ⚡ Total Attacks Launched
+                </span>
+                <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--pending)', marginTop: 4 }}>
+                  {board.reduce((acc, e) => acc + (e.total_submissions || 0), 0)} <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-2)' }}>attacks</span>
+                </div>
+              </div>
+
+              <div className="panel" style={{ padding: '14px 18px', borderLeft: '4px solid var(--wa)' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase' }}>
+                  🚨 Security / Proctor Alerts
+                </span>
+                <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--wa)', marginTop: 4 }}>
+                  {telemetry.filter((t) => t.integrity_status === 'FLAGGED').length}{' '}
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-2)' }}>
+                    flagged ({telemetry.reduce((a, t) => a + (t.fullscreen_exit_count || 0), 0)} exits · {telemetry.reduce((a, t) => a + (t.tab_switch_count || 0), 0)} tab-switches)
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="panel panel-scroll">
+            {/* Batch Filter Pills & Dashboard Table Selector */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+              <div className="batch-filter-bar" style={{ margin: 0 }}>
+                <span className="batch-filter-label">Filter Batch:</span>
+                <button
+                  className={`btn btn-sm ${selectedBatchId === undefined ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => handleSelectBatch(undefined)}
+                >
+                  All Clans
+                </button>
+                {batches.map((b) => {
+                  const isSelected = selectedBatchId === b.id;
+                  const statusDot = b.status === 'ACTIVE' ? '🟢' : b.status === 'COMPLETED' ? '🏁' : '⏳';
+                  return (
+                    <button
+                      key={b.id}
+                      className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => handleSelectBatch(b.id)}
+                    >
+                      {statusDot} {b.name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {user?.role === 'admin' && (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    className={`btn btn-sm ${dashboardView === 'combined' ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setDashboardView('combined')}
+                  >
+                    📊 All Intelligence
+                  </button>
+                  <button
+                    className={`btn btn-sm ${dashboardView === 'standings' ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setDashboardView('standings')}
+                  >
+                    🏆 Scores & Ranks
+                  </button>
+                  <button
+                    className={`btn btn-sm ${dashboardView === 'telemetry' ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setDashboardView('telemetry')}
+                  >
+                    🛡️ Proctor Surveillance
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* TABLE 1: War Standings & Scores */}
+            {(dashboardView === 'combined' || dashboardView === 'standings') && (
+            <div className="panel panel-scroll" style={{ marginBottom: 24 }}>
+              <div style={{ padding: '14px 18px 8px', borderBottom: '1px solid var(--line)' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gold-bright)' }}>
+                  🏆 Battle Standings & Clan Scores
+                </h3>
+              </div>
               <table className="table board-table">
                 <thead>
                   <tr>
@@ -373,6 +520,142 @@ export default function LeaderboardPage() {
                 </tbody>
               </table>
             </div>
+            )}
+
+            {/* TABLE 2: Clan Integrity & Anti-Cheat Telemetry (Discrete User Surveillance) */}
+            {user?.role === 'admin' && (dashboardView === 'combined' || dashboardView === 'telemetry') && (
+            <div className="panel panel-scroll" style={{ marginBottom: 24 }}>
+              <div style={{ padding: '14px 18px 8px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--wa)' }}>
+                    🛡️ Clan Anti-Cheat Surveillance & Proctoring Telemetry
+                  </h3>
+                  <p style={{ fontSize: '12px', color: 'var(--text-3)' }}>
+                    Discrete monitoring of contestant full-screen exits, window tab switches, and live contest activity.
+                  </p>
+                </div>
+                <span className="mono" style={{ fontSize: '12px', color: 'var(--text-3)' }}>
+                  {telemetry.length} clans under surveillance
+                </span>
+              </div>
+              <table className="table board-table">
+                <thead>
+                  <tr>
+                    <th>Clan Name</th>
+                    <th>Batch</th>
+                    <th className="align-right">🖥️ Fullscreen Exits</th>
+                    <th className="align-right">📑 Tab Switches</th>
+                    <th>Integrity Status</th>
+                    <th>Leader Info</th>
+                    <th className="align-right">Last Active Ping</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {telemetry
+                    .filter((t) => selectedBatchId === undefined || t.batch_id === selectedBatchId)
+                    .map((t) => {
+                      const statusColor =
+                        t.integrity_status === 'FLAGGED'
+                          ? 'var(--wa)'
+                          : t.integrity_status === 'CAUTION'
+                          ? 'var(--pending)'
+                          : 'var(--ac)';
+                      const statusBg =
+                        t.integrity_status === 'FLAGGED'
+                          ? 'rgba(239, 68, 68, 0.2)'
+                          : t.integrity_status === 'CAUTION'
+                          ? 'rgba(245, 158, 11, 0.15)'
+                          : 'rgba(74, 222, 128, 0.15)';
+                      return (
+                        <tr key={t.team_id}>
+                          <td>
+                            <strong>{t.team_name}</strong>
+                            <div className="mono" style={{ fontSize: '11px', color: 'var(--gold)' }}>
+                              {t.username}
+                            </div>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: '12px' }}>{t.batch_name}</span>
+                          </td>
+                          <td className="align-right">
+                            {t.fullscreen_exit_count > 0 ? (
+                              <span
+                                className="mono"
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: 6,
+                                  background: 'rgba(239, 68, 68, 0.2)',
+                                  border: '1px solid var(--wa)',
+                                  color: 'var(--wa)',
+                                  fontWeight: 700,
+                                }}
+                              >
+                                ⚠️ {t.fullscreen_exit_count} exits
+                              </span>
+                            ) : (
+                              <span className="mono" style={{ color: 'var(--text-3)' }}>0</span>
+                            )}
+                          </td>
+                          <td className="align-right">
+                            {t.tab_switch_count > 0 ? (
+                              <span
+                                className="mono"
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: 6,
+                                  background: 'rgba(245, 158, 11, 0.2)',
+                                  border: '1px solid var(--pending)',
+                                  color: 'var(--pending)',
+                                  fontWeight: 700,
+                                }}
+                              >
+                                📑 {t.tab_switch_count} switches
+                              </span>
+                            ) : (
+                              <span className="mono" style={{ color: 'var(--text-3)' }}>0</span>
+                            )}
+                          </td>
+                          <td>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 800,
+                                textTransform: 'uppercase',
+                                padding: '3px 10px',
+                                borderRadius: 8,
+                                border: `1px solid ${statusColor}`,
+                                color: statusColor,
+                                background: statusBg,
+                              }}
+                            >
+                              {t.integrity_status === 'FLAGGED' ? '🔴 FLAGGED' : t.integrity_status === 'CAUTION' ? '🟡 CAUTION' : '🟢 CLEAN'}
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: '12px' }}>{t.leader_name}</span>
+                            <div className="mono" style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+                              {t.leader_email}
+                            </div>
+                          </td>
+                          <td className="align-right">
+                            <span className="mono" style={{ fontSize: '12px', color: 'var(--text-2)' }}>
+                              {t.last_active_at ? new Date(t.last_active_at).toLocaleTimeString() : '—'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  {telemetry.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '24px' }}>
+                        No telemetry logs reported yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            )}
           </>
         ) : (
           <>
@@ -500,16 +783,45 @@ export default function LeaderboardPage() {
                       </div>
                     </div>
 
-                    {isNotStarted && (
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => handleStartTimer(b.id, b.name)}
-                        disabled={actionLoading}
-                        style={{ marginTop: 6 }}
-                      >
-                        <Icon name="play" size={14} /> Start Batch Timer
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                      {user?.role === 'admin' && isNotStarted && (
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => handleStartTimer(b.id, b.name)}
+                          disabled={actionLoading || startingBatchId === b.id}
+                        >
+                          {startingBatchId === b.id ? (
+                            <>
+                              <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, marginRight: 6, display: 'inline-block' }} />
+                              Starting…
+                            </>
+                          ) : (
+                            <>
+                              <Icon name="play" size={14} /> Start Batch Timer
+                            </>
+                          )}
+                        </button>
+                      )}
+                      {user?.role === 'admin' && (
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleResetTimer(b.id, b.name)}
+                          disabled={actionLoading || resettingBatchId === b.id}
+                          title="Reset timer to NOT_STARTED (development testing)"
+                        >
+                          {resettingBatchId === b.id ? (
+                            <>
+                              <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, marginRight: 6, display: 'inline-block' }} />
+                              Resetting…
+                            </>
+                          ) : (
+                            <>
+                              <Icon name="refresh" size={14} /> Reset Timer
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}

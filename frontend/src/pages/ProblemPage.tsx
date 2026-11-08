@@ -446,7 +446,7 @@ export default function ProblemPage() {
   const [dragging, setDragging] = useState(false);
   const splitRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const loadProblem = useCallback(() => {
     if (!slug) return;
     setProblem(null);
     setLoadError(null);
@@ -465,6 +465,25 @@ export default function ProblemPage() {
       .then((r) => setSubmissions(r.data))
       .catch(() => setSubmissions([]));
   }, [slug, disarm]);
+
+  useEffect(() => {
+    loadProblem();
+  }, [loadProblem]);
+
+  // Re-fetch if contest starts while user is on this page
+  useEffect(() => {
+    if (timerStatus === 'ACTIVE') {
+      loadProblem();
+    }
+  }, [timerStatus, loadProblem]);
+
+  useEffect(() => {
+    const handleBatchActivated = () => {
+      loadProblem();
+    };
+    window.addEventListener('batch:activated', handleBatchActivated);
+    return () => window.removeEventListener('batch:activated', handleBatchActivated);
+  }, [loadProblem]);
 
   useEffect(() => {
     try { localStorage.setItem(SPLIT_KEY, String(Math.round(split))); } catch { /* preference only */ }

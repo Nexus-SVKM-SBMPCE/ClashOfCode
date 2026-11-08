@@ -6,9 +6,9 @@ import Balloon from '../components/Balloon';
 import Icon from '../components/Icon';
 import { balloonFor, letterFor } from '../lib/arena';
 
-const DEMO_ACCOUNTS = [
-  { username: 'admin', password: 'admin123' },
-  { username: 'contestant1', password: 'pass123' },
+const DEMO_ACCOUNTS: { username: string; password: string }[] = [
+  // { username: 'admin', password: 'admin123' },
+  // { username: 'contestant1', password: 'pass123' },
 ];
 
 export default function LoginPage() {
@@ -24,6 +24,12 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    // Request fullscreen upon user gesture for automatic arena entry
+    if (typeof document !== 'undefined' && document.documentElement?.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+
     try {
       await signIn(username, password);
     } catch {

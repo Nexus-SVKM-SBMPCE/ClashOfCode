@@ -5,6 +5,7 @@ import { ToastProvider } from './Toast';
 import { ExamSecurityProvider } from './ExamSecurity';
 import Navbar from './Navbar';
 import BatchGate from './BatchGate';
+import { useTabSwitchMonitor } from './hooks/useTabSwitchMonitor';
 import LoginPage from './pages/LoginPage';
 import ProblemsPage from './pages/ProblemsPage';
 // Lazy: keeps the multi-MB Monaco editor out of the login/problems first load
@@ -32,6 +33,7 @@ function RequireAdmin({ children }: { children: ReactNode }) {
 
 function AppLayout() {
   const { user, loading } = useAuth();
+  useTabSwitchMonitor();
   return (
     <div className="app-root">
       {user && <Navbar />}

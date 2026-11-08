@@ -58,6 +58,15 @@ _PROBLEM_COLUMNS = {
 
 _USER_COLUMNS = {
     "team_id": "INTEGER DEFAULT NULL",
+    "tab_switch_count": "INTEGER NOT NULL DEFAULT 0",
+    "fullscreen_exit_count": "INTEGER NOT NULL DEFAULT 0",
+    "last_active_at": "TIMESTAMP DEFAULT NULL",
+}
+
+_TEAM_COLUMNS = {
+    "tab_switch_count": "INTEGER NOT NULL DEFAULT 0",
+    "fullscreen_exit_count": "INTEGER NOT NULL DEFAULT 0",
+    "last_active_at": "TIMESTAMP DEFAULT NULL",
 }
 
 _TAB_SWITCH_COLUMNS = {
@@ -90,6 +99,12 @@ def _migrate_columns():
             for name, ddl in _USER_COLUMNS.items():
                 if name not in user_cols:
                     conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
+
+        if inspector.has_table("teams"):
+            team_cols = {c["name"] for c in inspector.get_columns("teams")}
+            for name, ddl in _TEAM_COLUMNS.items():
+                if name not in team_cols:
+                    conn.execute(text(f"ALTER TABLE teams ADD COLUMN {name} {ddl}"))
 
         if inspector.has_table("tab_switch_events"):
             ev_cols = {c["name"] for c in inspector.get_columns("tab_switch_events")}
@@ -126,6 +141,9 @@ class Team(SQLModel, table=True):
     members_info: Optional[str] = Field(default=None)             # JSON string of members info
     batch_id: Optional[int] = Field(default=None, foreign_key="batches.id", index=True)
     total_score: int = Field(default=0)
+    tab_switch_count: int = Field(default=0)
+    fullscreen_exit_count: int = Field(default=0)
+    last_active_at: Optional[datetime] = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     batch: Optional["Batch"] = Relationship()
@@ -145,6 +163,9 @@ class User(SQLModel, table=True):
     role: str = Field(default="contestant")   # "admin" | "contestant"
     is_active: bool = Field(default=True)
     team_id: Optional[int] = Field(default=None, foreign_key="teams.id", index=True)
+    tab_switch_count: int = Field(default=0)
+    fullscreen_exit_count: int = Field(default=0)
+    last_active_at: Optional[datetime] = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     submissions: List["Submission"] = Relationship(back_populates="user")

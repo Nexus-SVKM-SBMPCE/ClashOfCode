@@ -210,15 +210,16 @@ def run_sample_submission(
         team = session.get(Team, current_user.team_id) if current_user.team_id else session.exec(select(Team).where(Team.username == current_user.username)).first()
         if team and team.batch_id:
             assigned_pids = session.exec(select(BatchProblem.problem_id).where(BatchProblem.batch_id == team.batch_id)).all()
-            if assigned_pids and prob.id not in assigned_pids:
+            any_allotted = session.exec(select(BatchProblem.id)).first() is not None
+            if any_allotted and prob.id not in assigned_pids:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This quest is not allotted to your batch arena.")
-
 
     if current_user.role == "contestant":
         team = session.get(Team, current_user.team_id) if current_user.team_id else session.exec(select(Team).where(Team.username == current_user.username)).first()
         if team and team.batch_id:
             assigned_pids = session.exec(select(BatchProblem.problem_id).where(BatchProblem.batch_id == team.batch_id)).all()
-            if assigned_pids and prob.id not in assigned_pids:
+            any_allotted = session.exec(select(BatchProblem.id)).first() is not None
+            if any_allotted and prob.id not in assigned_pids:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This quest is not allotted to your batch arena.")
 
 
@@ -289,6 +290,14 @@ def create_submission(
     ).first()
     if not prob:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Problem not found")
+
+    if current_user.role == "contestant":
+        team = session.get(Team, current_user.team_id) if current_user.team_id else session.exec(select(Team).where(Team.username == current_user.username)).first()
+        if team and team.batch_id:
+            assigned_pids = session.exec(select(BatchProblem.problem_id).where(BatchProblem.batch_id == team.batch_id)).all()
+            any_allotted = session.exec(select(BatchProblem.id)).first() is not None
+            if any_allotted and prob.id not in assigned_pids:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This quest is not allotted to your batch arena.")
 
     # Fetch all test cases (hidden + sample), ordered
     test_cases = session.exec(

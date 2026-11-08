@@ -18,7 +18,7 @@ server's current UTC time).  The frontend subtracts `server_now_utc` from
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -100,6 +100,8 @@ def _batch_to_timer_response(batch: Batch, now: datetime) -> BatchTimerResponse:
 # ---------------------------------------------------------------------------
 @router.get("/api/batches/my-batch/timer", response_model=BatchTimerResponse)
 def get_my_batch_timer(
+    response: Response = Response(),
+    batch_id: Optional[int] = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> BatchTimerResponse:
@@ -108,36 +110,45 @@ def get_my_batch_timer(
     The `server_now_utc` field is the authoritative time reference;
     the client MUST use it — never the browser's local clock.
     """
+    if response is not None:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     now = _utc_now()
-    batch = resolve_user_batch(session, current_user)
+    batch = resolve_user_batch(session, current_user, batch_id=batch_id)
     if batch is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No batch found. Admin must create a batch first.",
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
         )
+    # Refresh to ensure latest status committed across transactions
+    session.refresh(batch)
     return _batch_to_timer_response(batch, now)
 
 
-def resolve_user_batch(session: Session, current_user: User) -> Optional[Batch]:
+def resolve_user_batch(session: Session, current_user: User, batch_id: Optional[int] = None) -> Optional[Batch]:
     """Return the batch a user competes in: their team's batch, else the active
     batch, else the earliest batch. Shared by the timer and exam-security routes."""
     batch = None
 
-    # Check if contestant is part of a team with an assigned batch
-    team = None
-    if current_user.team_id:
-        team = session.get(Team, current_user.team_id)
-    elif current_user.role == "contestant":
-        team = session.exec(select(Team).where(Team.username == current_user.username)).first()
+    if current_user.role == "admin" and batch_id is not None:
+        batch = session.get(Batch, batch_id)
 
-    if team and team.batch_id:
-        batch = session.get(Batch, team.batch_id)
-
-    # Fallback to active batch, or earliest batch if no team/batch allotment
     if batch is None:
-        batch = session.exec(
-            select(Batch).where(Batch.status == BATCH_STATUS_ACTIVE)
-        ).first()
+        team = None
+        if current_user.team_id:
+            team = session.get(Team, current_user.team_id)
+        elif current_user.role == "contestant":
+            team = session.exec(select(Team).where(Team.username == current_user.username)).first()
+
+        if team:
+            session.refresh(team)
+            if team.batch_id:
+                batch = session.get(Batch, team.batch_id)
+
+    if batch is None and current_user.role == "admin":
+        batch = session.exec(select(Batch).where(Batch.status == BATCH_STATUS_ACTIVE).order_by(Batch.batch_number)).first()
+
+    # Fallback to earliest batch if no team/batch allotment
     if batch is None:
         batch = session.exec(select(Batch).order_by(Batch.batch_number)).first()  # type: ignore[arg-type]
     return batch
@@ -148,11 +159,16 @@ def resolve_user_batch(session: Session, current_user: User) -> Optional[Batch]:
 # ---------------------------------------------------------------------------
 @router.get("/api/admin/batches", response_model=List[Dict[str, Any]])
 def admin_list_batches(
+    response: Response = Response(),
     session: Session = Depends(get_session),
     _: User = Depends(require_admin),
 ) -> List[Dict[str, Any]]:
+    if response is not None:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     now = _utc_now()
     batches = session.exec(select(Batch).order_by(Batch.batch_number)).all()  # type: ignore[arg-type]
+    for b in batches:
+        session.refresh(b)
     return [
         {
             "id": b.id,
@@ -232,3 +248,32 @@ def admin_start_batch_timer(
         "duration_minutes": batch.duration_minutes,
         "server_now_utc": now.isoformat(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Admin — reset a batch timer (POST /api/admin/batches/{batch_id}/reset-timer)
+# ---------------------------------------------------------------------------
+@router.post("/api/admin/batches/{batch_id}/reset-timer")
+def admin_reset_batch_timer(
+    batch_id: int,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> Dict[str, Any]:
+    """
+    Resets the countdown timer for a specific batch back to NOT_STARTED.
+    Clears timer_started_at. Essential for dev testing and re-running rounds.
+    """
+    batch = session.get(Batch, batch_id)
+    if batch is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found")
+    batch.timer_started_at = None
+    batch.status = BATCH_STATUS_NOT_STARTED
+    session.add(batch)
+    session.commit()
+    session.refresh(batch)
+    return {
+        "message": f"Timer successfully reset for batch '{batch.name}'",
+        "batch_id": batch.id,
+        "status": batch.status,
+    }
+
