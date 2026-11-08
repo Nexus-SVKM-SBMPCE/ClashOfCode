@@ -108,22 +108,6 @@ CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","http://192.168.0.
 VITE_API_BASE_URL=http://192.168.0.116:8000/api
 ```
 
----
-
-## Database Setup & Demo Credentials
-
-The application uses an SQLite database with Write-Ahead Logging (WAL) for concurrent read-heavy operations. On initial startup, the backend automatically seeds the database with demo users and DSA benchmark problems.
-
-### Demo User Accounts
-
-| Role | Username | Password | Access Rights |
-| :--- | :--- | :--- | :--- |
-| **Admin** | `admin` | `admin123` | Create/edit problems, test cases, view all submissions |
-| **Contestant 1** | `contestant1` | `pass123` | Submit solutions, view personal history, leaderboard |
-| **Contestant 2** | `contestant2` | `pass123` | Submit solutions, view personal history, leaderboard |
-| **Contestant 3** | `contestant3` | `pass123` | Submit solutions, view personal history, leaderboard |
-
----
 
 ## Starting and Stopping Services
 
