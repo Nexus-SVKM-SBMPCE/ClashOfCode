@@ -57,6 +57,15 @@ _PROBLEM_COLUMNS = {
 
 _USER_COLUMNS = {
     "team_id": "INTEGER DEFAULT NULL",
+    "tab_switch_count": "INTEGER NOT NULL DEFAULT 0",
+    "fullscreen_exit_count": "INTEGER NOT NULL DEFAULT 0",
+    "last_active_at": "TIMESTAMP DEFAULT NULL",
+}
+
+_TEAM_COLUMNS = {
+    "tab_switch_count": "INTEGER NOT NULL DEFAULT 0",
+    "fullscreen_exit_count": "INTEGER NOT NULL DEFAULT 0",
+    "last_active_at": "TIMESTAMP DEFAULT NULL",
 }
 
 
@@ -82,6 +91,12 @@ def _migrate_columns():
             for name, ddl in _USER_COLUMNS.items():
                 if name not in user_cols:
                     conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
+
+        if inspector.has_table("teams"):
+            team_cols = {c["name"] for c in inspector.get_columns("teams")}
+            for name, ddl in _TEAM_COLUMNS.items():
+                if name not in team_cols:
+                    conn.execute(text(f"ALTER TABLE teams ADD COLUMN {name} {ddl}"))
 
         if not inspector.has_table("batch_problems"):
             conn.execute(text("""
@@ -110,6 +125,9 @@ class Team(SQLModel, table=True):
     members_info: Optional[str] = Field(default=None)             # JSON string of members info
     batch_id: Optional[int] = Field(default=None, foreign_key="batches.id", index=True)
     total_score: int = Field(default=0)
+    tab_switch_count: int = Field(default=0)
+    fullscreen_exit_count: int = Field(default=0)
+    last_active_at: Optional[datetime] = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     batch: Optional["Batch"] = Relationship()
@@ -129,6 +147,9 @@ class User(SQLModel, table=True):
     role: str = Field(default="contestant")   # "admin" | "contestant"
     is_active: bool = Field(default=True)
     team_id: Optional[int] = Field(default=None, foreign_key="teams.id", index=True)
+    tab_switch_count: int = Field(default=0)
+    fullscreen_exit_count: int = Field(default=0)
+    last_active_at: Optional[datetime] = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     submissions: List["Submission"] = Relationship(back_populates="user")
@@ -148,7 +169,8 @@ class Problem(SQLModel, table=True):
     difficulty: str = Field(default="medium")   # "easy" | "medium" | "hard"
     time_limit_sec: float = Field(default=2.0)
     memory_limit_kb: int = Field(default=262144)
-    is_visible: bool = Field(default=True)
+    is_visible: bool = Field(default=True)
+
     best_time_complexity: Optional[str] = Field(default="O(N)", max_length=50)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -230,8 +252,10 @@ class Submission(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Per-question solve time for tie-breaking (seconds elapsed from batch start to first AC)
-    solve_time_seconds: Optional[int] = None    # NULL until the submission is AC
-    time_complexity: Optional[str] = None       # Real-time evaluated time complexity, e.g. O(N)
+    solve_time_seconds: Optional[int] = None    # NULL until the submission is AC
+
+    time_complexity: Optional[str] = None       # Real-time evaluated time complexity, e.g. O(N)
+
     time_complexity_verdict: Optional[str] = None  # OPTIMAL | ACCEPTABLE | SUBOPTIMAL
     batch_id: Optional[int] = Field(default=None, foreign_key="batches.id", index=True)
 

@@ -138,7 +138,7 @@ def _assert_batch_active(session: Session, user: User) -> None:
 # ---------------------------------------------------------------------------
 @router.get("", response_model=List[ProblemSummary])
 def list_problems(
-    response: Response,
+    response: Response = Response(),
     batch_id: Optional[int] = None,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
@@ -161,8 +161,12 @@ def list_problems(
         assigned_pids = session.exec(
             select(BatchProblem.problem_id).where(BatchProblem.batch_id == target_batch_id)
         ).all()
-        if assigned_pids:
-            query = query.where(Problem.id.in_(assigned_pids))
+        any_allotted = session.exec(select(BatchProblem.id)).first() is not None
+        if any_allotted:
+            if assigned_pids:
+                query = query.where(Problem.id.in_(assigned_pids))
+            else:
+                query = query.where(Problem.id == -1)
 
     # Single-submission rule: a problem the team already submitted is hidden from them
     submitted = submitted_problem_ids(session, current_user)
@@ -187,7 +191,7 @@ def list_problems(
 @router.get("/{slug}", response_model=ProblemDetail)
 def get_problem(
     slug: str,
-    response: Response,
+    response: Response = Response(),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> ProblemDetail:
@@ -210,7 +214,8 @@ def get_problem(
             assigned_pids = session.exec(
                 select(BatchProblem.problem_id).where(BatchProblem.batch_id == team.batch_id)
             ).all()
-            if assigned_pids and prob.id not in assigned_pids:
+            any_allotted = session.exec(select(BatchProblem.id)).first() is not None
+            if any_allotted and prob.id not in assigned_pids:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="This quest is not allotted to your batch arena.",

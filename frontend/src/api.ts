@@ -406,6 +406,29 @@ let mockBatchTimer: BatchTimerInfo = {
   remaining_seconds: null,
 };
 
+export const resetBatchTimer = (batch_id: number) => {
+  if (demoMode.enabled) {
+    mockAdminBatches = mockAdminBatches.map((b) =>
+      b.id === batch_id
+        ? {
+            ...b,
+            status: 'NOT_STARTED',
+            timer_started_at: null,
+            remaining_seconds: null,
+          }
+        : b
+    );
+    mockBatchTimer = {
+      ...mockBatchTimer,
+      status: 'NOT_STARTED',
+      timer_started_at: null,
+      remaining_seconds: null,
+    };
+    return mockResp({ message: 'Reset', batch_id });
+  }
+  return api.post(`/api/admin/batches/${batch_id}/reset-timer`);
+};
+
 export const startBatchTimer = (batch_id: number) => {
   if (demoMode.enabled) {
     mockAdminBatches = mockAdminBatches.map((b) =>
@@ -444,7 +467,7 @@ export interface BatchTimerInfo {
   remaining_seconds: number | null;
 }
 
-export const getBatchTimer = () => {
+export const getBatchTimer = (batch_id?: number) => {
   if (demoMode.enabled) {
     return mockResp({
       ...mockBatchTimer,
@@ -452,6 +475,7 @@ export const getBatchTimer = () => {
     });
   }
   return api.get<BatchTimerInfo>('/api/batches/my-batch/timer', {
+    params: batch_id ? { batch_id } : {},
     headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
   });
 };
@@ -558,5 +582,86 @@ export const createAdminBatch = (data: { batch_number: number; name: string; dur
     });
   }
   return api.post<BatchAdminInfo>('/api/admin/batches', data);
+};
+
+// ─── Contest Proctoring & Telemetry ───────────────────────────────────────────
+export interface TelemetryItem {
+  team_id: number;
+  team_name: string;
+  username: string;
+  leader_name: string;
+  leader_email: string;
+  batch_id: number | null;
+  batch_name: string;
+  total_score: number;
+  solved_count: number;
+  total_attacks: number;
+  fullscreen_exit_count: number;
+  tab_switch_count: number;
+  integrity_status: 'CLEAN' | 'CAUTION' | 'FLAGGED';
+  last_active_at: string | null;
+}
+
+export const reportTelemetry = (data: { event_type: 'tab_switch' | 'fullscreen_exit' | 'heartbeat'; count?: number }) => {
+  if (demoMode.enabled) {
+    return mockResp({ status: 'ok', ...data });
+  }
+  return api.post('/api/telemetry/report', data);
+};
+
+export const getAdminTelemetry = () => {
+  if (demoMode.enabled) {
+    return mockResp<TelemetryItem[]>([
+      {
+        team_id: 1,
+        team_name: 'Code Clan',
+        username: 'team1',
+        leader_name: 'Alice Chen',
+        leader_email: 'alice@clash.local',
+        batch_id: 1,
+        batch_name: 'Batch 1',
+        total_score: 500,
+        solved_count: 5,
+        total_attacks: 7,
+        fullscreen_exit_count: 0,
+        tab_switch_count: 1,
+        integrity_status: 'CLEAN',
+        last_active_at: new Date().toISOString(),
+      },
+      {
+        team_id: 2,
+        team_name: 'Byte Brawlers',
+        username: 'team2',
+        leader_name: 'Bob Patel',
+        leader_email: 'bob@clash.local',
+        batch_id: 1,
+        batch_name: 'Batch 1',
+        total_score: 400,
+        solved_count: 4,
+        total_attacks: 6,
+        fullscreen_exit_count: 1,
+        tab_switch_count: 3,
+        integrity_status: 'CAUTION',
+        last_active_at: new Date().toISOString(),
+      },
+      {
+        team_id: 3,
+        team_name: 'Algo Assassins',
+        username: 'team3',
+        leader_name: 'Chloe Sharma',
+        leader_email: 'chloe@clash.local',
+        batch_id: 2,
+        batch_name: 'Batch 2',
+        total_score: 300,
+        solved_count: 3,
+        total_attacks: 5,
+        fullscreen_exit_count: 3,
+        tab_switch_count: 7,
+        integrity_status: 'FLAGGED',
+        last_active_at: new Date().toISOString(),
+      },
+    ]);
+  }
+  return api.get<TelemetryItem[]>('/api/telemetry/admin/discrete');
 };
 

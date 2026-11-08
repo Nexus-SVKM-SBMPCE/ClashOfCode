@@ -6,6 +6,7 @@
  * Dispatches 'contest:violation' window events on exit.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { reportTelemetry } from '../api';
 
 export const FULLSCREEN_STORAGE_KEY = 'coc_fullscreen_exit_count';
 
@@ -73,6 +74,7 @@ export function useFullscreenLock(): FullscreenLockState {
                 detail: { type: 'fullscreen_exit', count: updated },
               })
             );
+            reportTelemetry({ event_type: 'fullscreen_exit', count: 1 }).catch(() => {});
           }
           return updated;
         });
