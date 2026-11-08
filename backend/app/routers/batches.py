@@ -18,7 +18,7 @@ server's current UTC time).  The frontend subtracts `server_now_utc` from
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -100,6 +100,7 @@ def _batch_to_timer_response(batch: Batch, now: datetime) -> BatchTimerResponse:
 # ---------------------------------------------------------------------------
 @router.get("/api/batches/my-batch/timer", response_model=BatchTimerResponse)
 def get_my_batch_timer(
+    response: Response,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> BatchTimerResponse:
@@ -108,6 +109,7 @@ def get_my_batch_timer(
     The `server_now_utc` field is the authoritative time reference;
     the client MUST use it — never the browser's local clock.
     """
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     now = _utc_now()
     batch = None
 
@@ -121,18 +123,17 @@ def get_my_batch_timer(
     if team and team.batch_id:
         batch = session.get(Batch, team.batch_id)
 
-    # Fallback to active batch, or earliest batch if no team/batch allotment
-    if batch is None:
-        batch = session.exec(
-            select(Batch).where(Batch.status == BATCH_STATUS_ACTIVE)
-        ).first()
+    # Fallback to earliest batch if no team/batch allotment
     if batch is None:
         batch = session.exec(select(Batch).order_by(Batch.batch_number)).first()  # type: ignore[arg-type]
     if batch is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No batch found. Admin must create a batch first.",
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
         )
+    # Refresh to ensure latest status committed across transactions
+    session.refresh(batch)
     return _batch_to_timer_response(batch, now)
 
 
@@ -141,11 +142,15 @@ def get_my_batch_timer(
 # ---------------------------------------------------------------------------
 @router.get("/api/admin/batches", response_model=List[Dict[str, Any]])
 def admin_list_batches(
+    response: Response,
     session: Session = Depends(get_session),
     _: User = Depends(require_admin),
 ) -> List[Dict[str, Any]]:
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     now = _utc_now()
     batches = session.exec(select(Batch).order_by(Batch.batch_number)).all()  # type: ignore[arg-type]
+    for b in batches:
+        session.refresh(b)
     return [
         {
             "id": b.id,

@@ -31,6 +31,7 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [startingBatchId, setStartingBatchId] = useState<number | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date>(() => new Date());
   const [error, setError] = useState<string | null>(null);
 
@@ -92,8 +93,11 @@ export default function LeaderboardPage() {
   }, []);
 
   const loadBatches = useCallback(() => {
-    getAdminBatches()
-      .then((r) => setBatches(r.data))
+    return getAdminBatches()
+      .then((r) => {
+        setBatches(r.data);
+        return r.data;
+      })
       .catch(() => {});
   }, []);
 
@@ -152,20 +156,29 @@ export default function LeaderboardPage() {
     const interval = setInterval(() => {
       refreshLeaderboard(selectedBatchId);
       if (activeTab === 'allotment') {
-        loadBatches();
         loadTeams();
       }
     }, 15000);
     return () => clearInterval(interval);
-  }, [refreshLeaderboard, selectedBatchId, activeTab, loadBatches, loadTeams]);
+  }, [refreshLeaderboard, selectedBatchId, activeTab, loadTeams]);
 
+  // Real-time 1-second batch polling for admin view to see the timer count down live
   useEffect(() => {
     if (activeTab === 'allotment') {
       loadBatches();
+      const interval = setInterval(() => {
+        loadBatches();
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [activeTab, loadBatches]);
+
+  useEffect(() => {
+    if (activeTab === 'allotment') {
       loadTeams();
       loadBatchProblems(selectedConfigBatchId);
     }
-  }, [activeTab, loadBatches, loadTeams, loadBatchProblems, selectedConfigBatchId]);
+  }, [activeTab, loadTeams, loadBatchProblems, selectedConfigBatchId]);
 
   const handleSelectBatch = (batchId?: number) => {
     setSelectedBatchId(batchId);
@@ -203,14 +216,39 @@ export default function LeaderboardPage() {
   };
 
   const handleStartTimer = async (batchId: number, batchName: string) => {
+    if (startingBatchId !== null) return;
+    setStartingBatchId(batchId);
     setActionLoading(true);
+
+    const prevBatches = [...batches];
+    // Optimistically reflect ACTIVE state immediately
+    setBatches((prev) =>
+      prev.map((b) =>
+        b.id === batchId
+          ? {
+              ...b,
+              status: 'ACTIVE',
+              timer_started_at: new Date().toISOString(),
+              remaining_seconds: b.duration_minutes * 60,
+            }
+          : b
+      )
+    );
+
     try {
-      await startBatchTimer(batchId);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Network request timed out. Please check server status.')), 8000)
+      );
+      await Promise.race([startBatchTimer(batchId), timeoutPromise]);
       addToast(`Countdown timer started for ${batchName}`, 'success');
-      loadBatches();
+      // Fetch authoritative updated batch state from backend
+      await loadBatches();
     } catch (err: any) {
-      addToast(err.response?.data?.detail || 'Failed to start timer for batch', 'error');
+      // Revert optimistic update on error or timeout
+      setBatches(prevBatches);
+      addToast(err.response?.data?.detail || err.message || 'Failed to start timer for batch', 'error');
     } finally {
+      setStartingBatchId(null);
       setActionLoading(false);
     }
   };
@@ -491,14 +529,23 @@ export default function LeaderboardPage() {
                       </div>
                     </div>
 
-                    {isNotStarted && (
+                    {user?.role === 'admin' && isNotStarted && (
                       <button
                         className="btn btn-primary btn-sm"
                         onClick={() => handleStartTimer(b.id, b.name)}
-                        disabled={actionLoading}
+                        disabled={actionLoading || startingBatchId === b.id}
                         style={{ marginTop: 6 }}
                       >
-                        <Icon name="play" size={14} /> Start Batch Timer
+                        {startingBatchId === b.id ? (
+                          <>
+                            <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, marginRight: 6, display: 'inline-block' }} />
+                            Starting…
+                          </>
+                        ) : (
+                          <>
+                            <Icon name="play" size={14} /> Start Batch Timer
+                          </>
+                        )}
                       </button>
                     )}
                   </div>

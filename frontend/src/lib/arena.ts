@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getProblems, getMySubmissions } from '../api';
 import type { Problem, Submission } from '../api';
+import { useCountdownTimer } from '../useCountdownTimer';
 
 // CoC-themed colours: gold, elixir, war red, gem blue, emerald, dark elixir, fire orange, royal purple.
 const BALLOONS = ['#ffd700', '#d946ef', '#ff4d5a', '#5AB0FF', '#4ade80', '#a855f7', '#ff6b35', '#c084fc'];
@@ -33,6 +34,7 @@ export function useArena(trackStatus: boolean) {
   const [status, setStatus] = useState<Record<string, ProblemStatus>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const { status: timerStatus } = useCountdownTimer();
 
   const loadStatus = useCallback(() => {
     if (!trackStatus) return;
@@ -41,15 +43,39 @@ export function useArena(trackStatus: boolean) {
       .catch(() => { /* status is an enhancement; the list still works without it */ });
   }, [trackStatus]);
 
-  useEffect(() => {
+  const loadProblems = useCallback(() => {
+    setLoading(true);
     getProblems()
-      .then((r) => setProblems(r.data.map((p, i) => ({ ...p, letter: letterFor(i), balloon: balloonFor(i) }))))
+      .then((r) => {
+        setProblems(r.data.map((p, i) => ({ ...p, letter: letterFor(i), balloon: balloonFor(i) })));
+        setError(false);
+      })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    loadProblems();
     loadStatus();
     window.addEventListener('submission:created', loadStatus);
-    return () => window.removeEventListener('submission:created', loadStatus);
-  }, [loadStatus]);
+    const handleBatchActivated = () => {
+      loadProblems();
+      loadStatus();
+    };
+    window.addEventListener('batch:activated', handleBatchActivated);
+    return () => {
+      window.removeEventListener('submission:created', loadStatus);
+      window.removeEventListener('batch:activated', handleBatchActivated);
+    };
+  }, [loadProblems, loadStatus]);
+
+  // When timer becomes ACTIVE, re-fetch problem statements immediately
+  useEffect(() => {
+    if (timerStatus === 'ACTIVE') {
+      loadProblems();
+      loadStatus();
+    }
+  }, [timerStatus, loadProblems, loadStatus]);
 
   // Single-submission rule: a submitted quest disappears from the team's list. The backend already
   // omits it on reload; filtering here too makes it vanish immediately after submitting (and in demo mode).

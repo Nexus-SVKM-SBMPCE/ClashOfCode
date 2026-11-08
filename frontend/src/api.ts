@@ -215,7 +215,9 @@ export const getMe = () => {
 // ─── Problems ─────────────────────────────────────────────────────────────────
 export const getProblems = () => {
   if (demoMode.enabled) return mockResp(MOCK_PROBLEMS as Problem[]);
-  return api.get<Problem[]>('/api/problems');
+  return api.get<Problem[]>('/api/problems', {
+    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+  });
 };
 
 export const getProblem = (slug: string) => {
@@ -224,7 +226,9 @@ export const getProblem = (slug: string) => {
     if (p) return mockResp(p as ProblemDetail);
     return mockResp(MOCK_PROBLEM_DETAIL['two-sum'] as ProblemDetail);
   }
-  return api.get<ProblemDetail>(`/api/problems/${slug}`);
+  return api.get<ProblemDetail>(`/api/problems/${slug}`, {
+    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+  });
 };
 
 // ─── Submissions ──────────────────────────────────────────────────────────────
@@ -326,12 +330,14 @@ export const getLeaderboard = (batch_id?: number) => {
   });
 };
 
+let mockAdminBatches: BatchAdminInfo[] = [
+  { id: 1, batch_number: 1, name: 'Batch 1', status: 'NOT_STARTED', timer_started_at: null, duration_minutes: 60, remaining_seconds: null, server_now_utc: new Date().toISOString() },
+  { id: 2, batch_number: 2, name: 'Batch 2', status: 'NOT_STARTED', timer_started_at: null, duration_minutes: 60, remaining_seconds: null, server_now_utc: new Date().toISOString() },
+];
+
 export const getAdminBatches = () => {
   if (demoMode.enabled) {
-    return mockResp<BatchAdminInfo[]>([
-      { id: 1, batch_number: 1, name: 'Batch 1', status: 'ACTIVE', timer_started_at: new Date().toISOString(), duration_minutes: 60, remaining_seconds: 3200, server_now_utc: new Date().toISOString() },
-      { id: 2, batch_number: 2, name: 'Batch 2', status: 'NOT_STARTED', timer_started_at: null, duration_minutes: 60, remaining_seconds: null, server_now_utc: new Date().toISOString() },
-    ]);
+    return mockResp<BatchAdminInfo[]>(mockAdminBatches);
   }
   return api.get<BatchAdminInfo[]>('/api/admin/batches');
 };
@@ -390,8 +396,36 @@ export const autoAllotBatchProblems = (problems_per_batch?: number) => {
   return api.post('/api/admin/batches/allot-problems', { problems_per_batch });
 };
 
+let mockBatchTimer: BatchTimerInfo = {
+  batch_id: 1,
+  batch_name: 'Batch 1 (Demo)',
+  status: 'NOT_STARTED',
+  timer_started_at: null,
+  duration_minutes: 60,
+  server_now_utc: new Date().toISOString(),
+  remaining_seconds: null,
+};
+
 export const startBatchTimer = (batch_id: number) => {
-  if (demoMode.enabled) return mockResp({ message: 'Started', batch_id });
+  if (demoMode.enabled) {
+    mockAdminBatches = mockAdminBatches.map((b) =>
+      b.id === batch_id
+        ? {
+            ...b,
+            status: 'ACTIVE',
+            timer_started_at: new Date().toISOString(),
+            remaining_seconds: b.duration_minutes * 60,
+          }
+        : b
+    );
+    mockBatchTimer = {
+      ...mockBatchTimer,
+      status: 'ACTIVE',
+      timer_started_at: new Date().toISOString(),
+      remaining_seconds: mockBatchTimer.duration_minutes * 60,
+    };
+    return mockResp({ message: 'Started', batch_id });
+  }
   return api.post(`/api/admin/batches/${batch_id}/start-timer`);
 };
 
@@ -410,19 +444,16 @@ export interface BatchTimerInfo {
   remaining_seconds: number | null;
 }
 
-const MOCK_BATCH_TIMER: BatchTimerInfo = {
-  batch_id: 1,
-  batch_name: 'Batch 1 (Demo)',
-  status: 'ACTIVE',
-  timer_started_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // started 5 min ago
-  duration_minutes: 60,
-  server_now_utc: new Date().toISOString(),
-  remaining_seconds: 55 * 60, // 55 minutes left
-};
-
 export const getBatchTimer = () => {
-  if (demoMode.enabled) return mockResp(MOCK_BATCH_TIMER);
-  return api.get<BatchTimerInfo>('/api/batches/my-batch/timer');
+  if (demoMode.enabled) {
+    return mockResp({
+      ...mockBatchTimer,
+      server_now_utc: new Date().toISOString(),
+    });
+  }
+  return api.get<BatchTimerInfo>('/api/batches/my-batch/timer', {
+    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+  });
 };
 
 
