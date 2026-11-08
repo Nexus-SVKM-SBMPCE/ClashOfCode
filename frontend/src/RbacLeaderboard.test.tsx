@@ -42,6 +42,8 @@ vi.mock('./api', () => ({
   assignTeamBatch: vi.fn().mockResolvedValue({ data: {} }),
   autoAllotBatches: vi.fn().mockResolvedValue({ data: {} }),
   startBatchTimer: vi.fn().mockResolvedValue({ data: {} }),
+  resetBatchTimer: vi.fn().mockResolvedValue({ data: {} }),
+  getAdminTelemetry: vi.fn().mockResolvedValue({ data: [] }),
   demoMode: { enabled: false },
 }));
 

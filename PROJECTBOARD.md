@@ -316,6 +316,33 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - Problem letters (A–E) are computed from the visible list, so they can shift on reload once a quest is submitted (cosmetic)
   - Pre-existing, not from this work: Monaco is a controlled editor and drops characters under machine-speed typing (reproduced on the untouched `main` too). Real typing speed is fine; worth a look if teams report lost keystrokes
 
+#### Yash — Round 2 (2026-11-08)
+- [x] **Batch-Wise Allotment & Leakage Resolution**:
+  - [x] Fixed `backend/app/routers/problems.py` (`list_problems` & `get_problem`) to strictly enforce batch boundaries when batch problems are configured. Solves empty/unallotted fallback bug where all questions leaked to every batch.
+  - [x] Fixed `backend/app/routers/submissions.py` (`create_submission` & `run_sample_submission`) to reject submission attempts for unallotted problems with HTTP 403.
+  - [x] Updated `backend/app/seeder.py` with distinct default problem allotments for Batch 1 and Batch 2.
+  - [x] Automated tests in `tests/test_batch_problem_allotment.py` pass (100% isolation verified, 0 leaked questions).
+- [x] **Timer Reset Engine & Multi-Batch Timer Sync**:
+  - [x] Added `POST /api/admin/batches/{batch_id}/reset-timer` resetting timer status to `NOT_STARTED` and clearing `timer_started_at`.
+  - [x] Updated `GET /api/batches/my-batch/timer` to accept `?batch_id=X` query param for admin inspection and dynamically fallback to active batches.
+  - [x] Frontend `useCountdownTimer.ts` updated to reset monotonic clamps on batch transition or `NOT_STARTED` status, preventing frozen clocks.
+  - [x] Added "🔄 Reset Timer" action button to batch cards in `LeaderboardPage.tsx`.
+- [x] **Anti-Cheat Proctoring Telemetry & Surveillance**:
+  - [x] Added `tab_switch_count`, `fullscreen_exit_count`, `last_active_at` to `Team` and `User` models with automatic SQLite migration.
+  - [x] Implemented `POST /api/telemetry/report` for real-time violation reporting with rate throttling.
+  - [x] Implemented `GET /api/telemetry/admin/discrete` calculating clan integrity status (`CLEAN`, `CAUTION`, `FLAGGED`).
+  - [x] Frontend hooks (`useTabSwitchMonitor.ts` & `useFullscreenLock.ts`) actively report tab switches, window blur, and fullscreen escape events.
+- [x] **Admin Discrete Command Center Dashboard**:
+  - [x] Built discrete multi-table dashboard in `LeaderboardPage.tsx`:
+    - Event Overview KPI cards (Active Battle Clans, AC Victories, Total Attacks, Proctor Alerts).
+    - Dynamic filter toggles (`📊 All Intelligence`, `🏆 Scores & Ranks`, `🛡️ Proctor Surveillance`).
+    - Table 1: Clan Standings & Battle Scores.
+    - Table 2: Discrete Proctoring Telemetry with tab switches, fullscreen exit pills, integrity badges, and last active ping.
+- [x] **Test Verification**:
+  - [x] Backend: `backend/.venv/Scripts/pytest.exe tests/test_batch_problem_allotment.py tests/test_timer_and_telemetry.py` (5/5 PASS in 1.87s).
+  - [x] Frontend: `npm test --prefix frontend -- --run` (10/10 test files, 58/58 tests PASS).
+  - [x] Frontend Build: `npm run build --prefix frontend` (Exit 0, clean production bundle).
+
 ---
 
 ## 5. Key Decisions

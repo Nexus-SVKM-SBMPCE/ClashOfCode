@@ -66,6 +66,7 @@ export function useCountdownTimer(): CountdownState {
   const lastRemainingRef = useRef<number | null>(null);
   const lastStartedAtRef = useRef<string | null>(null);
   const lastDurationRef = useRef<number | null>(null);
+  const lastBatchIdRef = useRef<number | null>(null);
   const prevStatusRef = useRef<TimerStatus>('loading');
 
   useEffect(() => {
@@ -125,13 +126,15 @@ export function useCountdownTimer(): CountdownState {
         return;
       }
 
-      // Reset monotonic reference if contest was restarted or duration modified
+      // Reset monotonic reference if contest was restarted, batch changed, or duration modified
       if (
         lastStartedAtRef.current !== data.timer_started_at ||
-        lastDurationRef.current !== data.duration_minutes
+        lastDurationRef.current !== data.duration_minutes ||
+        lastBatchIdRef.current !== data.batch_id
       ) {
         lastStartedAtRef.current = data.timer_started_at;
         lastDurationRef.current = data.duration_minutes;
+        lastBatchIdRef.current = data.batch_id;
         lastRemainingRef.current = null;
       }
 
@@ -207,9 +210,17 @@ export function useCountdownTimer(): CountdownState {
 
     // ── Fallback listener for local same-tab / test trigger ──
     const handleBatchStarted = () => {
+      lastRemainingRef.current = null;
+      lastStartedAtRef.current = null;
+      fetchTimer();
+    };
+    const handleTimerReset = () => {
+      lastRemainingRef.current = null;
+      lastStartedAtRef.current = null;
       fetchTimer();
     };
     window.addEventListener('batch:started', handleBatchStarted);
+    window.addEventListener('batch:timer-reset', handleTimerReset);
 
     // ── Boot sequence ──
     fetchTimer().then(() => {
@@ -223,6 +234,7 @@ export function useCountdownTimer(): CountdownState {
       if (tickId) clearInterval(tickId);
       if (pollTimerId) clearTimeout(pollTimerId);
       window.removeEventListener('batch:started', handleBatchStarted);
+      window.removeEventListener('batch:timer-reset', handleTimerReset);
     };
   }, []); // Empty deps: runs on mount, avoids teardown/restart loops
 

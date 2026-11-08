@@ -390,3 +390,22 @@ def seed(session: Session) -> None:
             user.team_id = team.id
             session.add(user)
             session.commit()
+    # -----------------------------------------------------------------------
+    # Seed Batch Problem Allotment (Distinct Questions per Batch)
+    # -----------------------------------------------------------------------
+    from app.models import BatchProblem
+    existing_allotment = session.exec(select(BatchProblem.id)).first()
+    if not existing_allotment and 1 in batches and 2 in batches:
+        prob_by_slug = {p.slug: p.id for p in session.exec(select(Problem)).all()}
+        b1 = batches[1]
+        b2 = batches[2]
+        # Batch 1: Two Sum, Fibonacci, Palindrome Check
+        for s in ["two-sum", "fibonacci", "palindrome-check"]:
+            if s in prob_by_slug:
+                session.add(BatchProblem(batch_id=b1.id, problem_id=prob_by_slug[s]))
+        # Batch 2: Binary Search, Max Subarray, Two Sum
+        for s in ["binary-search", "max-subarray", "two-sum"]:
+            if s in prob_by_slug:
+                session.add(BatchProblem(batch_id=b2.id, problem_id=prob_by_slug[s]))
+        session.commit()
+

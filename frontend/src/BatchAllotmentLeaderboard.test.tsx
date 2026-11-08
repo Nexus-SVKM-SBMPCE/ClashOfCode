@@ -22,6 +22,8 @@ vi.mock('./api', () => ({
   assignTeamBatch: vi.fn(),
   autoAllotBatches: vi.fn(),
   startBatchTimer: vi.fn(),
+  resetBatchTimer: vi.fn().mockResolvedValue({ data: {} }),
+  getAdminTelemetry: vi.fn().mockResolvedValue({ data: [] }),
   getBatchProblems: vi.fn(),
   setBatchProblems: vi.fn(),
   autoAllotBatchProblems: vi.fn(),
