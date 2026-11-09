@@ -16,6 +16,8 @@ import Balloon from '../components/Balloon';
 import Difficulty from '../components/Difficulty';
 import Icon from '../components/Icon';
 import { useExamSecurity } from '../ExamSecurity';
+import { EXAM_EDITOR_ATTR } from '../hooks/useCopyPasteGuard';
+import { registerEditorSelection } from '../lib/trustedClipboard';
 
 const LANGUAGES = [
   { id: 'python', label: 'Python 3.8', ext: 'py' },
@@ -768,7 +770,7 @@ export default function ProblemPage() {
             </div>
           )}
 
-          <div className="editor-wrap">
+          <div className="editor-wrap" {...{ [EXAM_EDITOR_ATTR]: '' }}>
             <Editor
               height="100%"
               language={lang === 'cpp' ? 'cpp' : lang === 'c' ? 'c' : lang}
@@ -779,6 +781,13 @@ export default function ProblemPage() {
               onChange={(v) => setCode(v || '')}
               onMount={(editor, monaco) => {
                 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => submitRef.current());
+                // Exam security: lets the clipboard guard record what the contestant copies from their own code
+                const unregister = registerEditorSelection(() => {
+                  const model = editor.getModel();
+                  const sel = editor.getSelection();
+                  return model && sel && !sel.isEmpty() ? model.getValueInRange(sel) : '';
+                });
+                editor.onDidDispose(unregister);
               }}
               options={{
                 fontSize: 14,
