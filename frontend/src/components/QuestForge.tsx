@@ -122,7 +122,7 @@ export default function QuestForge() {
         });
       }
 
-      addToast(`⚔️ Quest "${title}" forged successfully with ${testCases.length} test cases!`, 'success');
+      addToast(`Quest "${title}" forged successfully with ${testCases.length} test cases!`, 'success');
 
       // Reset form
       setTitle('');
@@ -165,7 +165,7 @@ export default function QuestForge() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div>
             <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gold-bright)' }}>
-              ⚔️ Arena Quest Roster & Complexity Config
+              Arena Quest Roster & Complexity Config
             </h3>
             <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>
               All problem statements active in the arena with expected optimal time complexities.
@@ -233,7 +233,7 @@ export default function QuestForge() {
                         color: 'var(--gold-bright)',
                       }}
                     >
-                      ⚡ {p.best_time_complexity || 'O(N)'}
+                      {p.best_time_complexity || 'O(N)'}
                     </span>
                   </td>
                   <td>
@@ -272,7 +272,7 @@ export default function QuestForge() {
       <div className="panel" style={{ padding: '24px' }}>
         <div style={{ marginBottom: 20 }}>
           <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--gold-bright)', marginBottom: 4 }}>
-            ⚒️ Quest Forge — Create New Problem Statement
+            Quest Forge — Create New Problem Statement
           </h2>
           <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>
             Design a new battle challenge, establish its optimal time complexity, and construct sample/hidden test cases.
@@ -330,13 +330,13 @@ export default function QuestForge() {
 
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--gold-bright)', marginBottom: 6 }}>
-                ⚡ Best/Optimal Time Complexity *
+                Best/Optimal Time Complexity *
               </label>
               <select
                 className="select mono"
                 value={bestComplexity}
                 onChange={(e) => setBestComplexity(e.target.value)}
-                style={{ width: '100%', height: 40, border: '2px solid var(--gold)', color: 'var(--gold-bright)' }}
+                style={{ width: '100%', height: 40 }}
               >
                 {COMPLEXITY_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -475,7 +475,7 @@ export default function QuestForge() {
                           style={{ accentColor: 'var(--gold)', cursor: 'pointer' }}
                         />
                         <span style={{ color: tc.is_sample ? 'var(--ac)' : 'var(--text-3)', fontWeight: 600 }}>
-                          {tc.is_sample ? '★ Sample Test Case (Public)' : '🔒 Hidden Test Case'}
+                          {tc.is_sample ? 'Sample Test Case (Public)' : 'Hidden Test Case'}
                         </span>
                       </label>
                     </div>

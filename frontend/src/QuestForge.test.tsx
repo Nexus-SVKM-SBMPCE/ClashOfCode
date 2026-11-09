@@ -53,8 +53,8 @@ describe('QuestForge Component', () => {
       expect(screen.getByText('Binary Search')).toBeDefined();
     });
 
-    expect(screen.getByText(/⚡ O\(N\)/)).toBeDefined();
-    expect(screen.getByText(/⚡ O\(log N\)/)).toBeDefined();
+    expect(screen.getAllByText(/O\(N\)/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/O\(log N\)/).length).toBeGreaterThan(0);
   });
 
   it('auto-generates slug from title and includes best time complexity options', async () => {

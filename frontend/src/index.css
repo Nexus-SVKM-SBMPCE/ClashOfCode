@@ -4,8 +4,36 @@
    3D raised buttons, clan badge styling, war trophy icons, medieval UI.
    ========================================================================== */
 
-/* ── Google Fonts (Supercell-inspired) ─────────────────────────────────── */
-/* Simple, bundled fonts (Inter + JetBrains Mono) */
+/* ── Supercell Clash of Clans: Clash Regular Font ────────────────────────── */
+@font-face {
+  font-family: 'Clash Regular';
+  src: url('/fonts/Clash-Regular.otf') format('opentype'),
+       url('/fonts/Clash-Regular.ttf') format('truetype'),
+       url('/fonts/Clash_Regular.otf.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Clash Regular';
+  src: url('/fonts/Clash-Regular.otf') format('opentype'),
+       url('/fonts/Clash-Regular.ttf') format('truetype'),
+       url('/fonts/Clash_Regular.otf.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Clash Regular';
+  src: url('/fonts/Clash-Regular.otf') format('opentype'),
+       url('/fonts/Clash-Regular.ttf') format('truetype'),
+       url('/fonts/Clash_Regular.otf.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   /* ── CoC Surfaces ── */
@@ -67,6 +95,7 @@
   /* ── Type ── */
   --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Clash Regular', 'Supercell-Magic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
   --fs-xs: 11px; --fs-sm: 12px; --fs-base: 13px; --fs-md: 14px; --fs-lg: 16px; --fs-xl: 20px;
 
@@ -109,6 +138,27 @@ code, pre, kbd { font-family: var(--font-mono); }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: var(--r-sm); }
 
 * { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+
+/* ── Headings across all pages: Authentic Clash Regular Font ─────────────── */
+h1, h2, h3, h4, h5, h6,
+.page-title,
+.heading,
+.title,
+.card-title,
+.modal-title,
+.dialog-title,
+.samples-title,
+.state-title,
+.login-brand h1,
+.login-title,
+.batch-gate-title,
+.waiting-title,
+.section-title,
+.admin-section-title,
+.forge-title {
+  font-family: var(--font-heading) !important;
+  letter-spacing: 0.025em;
+}
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
@@ -477,7 +527,7 @@ kbd { font-size: 10px; padding: 0 4px; border-radius: 3px; border: 1px solid var
   font-size: var(--fs-sm); font-weight: 700; color: var(--text-2); 
   letter-spacing: 0.02em;
 }
-.input, .select {
+.input {
   height: 40px; padding: 0 var(--s3);
   background: linear-gradient(180deg, #0d1220, #111827);
   border: 2px solid var(--line-strong); border-radius: var(--r);
@@ -486,22 +536,61 @@ kbd { font-size: 10px; padding: 0 4px; border-radius: 3px; border: 1px solid var
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 .input::placeholder { color: var(--text-3); }
-.input:hover, .select:hover { border-color: var(--gold-dark); }
-.input:focus, .select:focus { 
+.input:hover { border-color: var(--gold-dark); }
+.input:focus { 
   outline: none; 
   border-color: var(--gold); 
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 12px var(--gold-glow); 
 }
 .input[aria-invalid='true'] { border-color: var(--wa); }
-.select {
-  appearance: none; height: 32px; font-size: var(--fs-base); padding-right: 28px; cursor: pointer;
-  background: linear-gradient(180deg, var(--surface-3), var(--surface-2)) padding-box,
-              linear-gradient(180deg, var(--line-strong), var(--line)) border-box;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23f5a623' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 9px center;
+
+/* ── Dropdown / Select Boxes — CoC 3D Beveled Gold Theme ─────────── */
+.select, select.select, select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  height: 38px;
+  padding: 0 34px 0 12px;
+  background: linear-gradient(180deg, #1e2844 0%, #121829 100%) !important;
+  border: 2px solid var(--gold) !important;
+  border-radius: var(--r) !important;
+  color: var(--gold-bright) !important;
+  font-family: var(--font-ui) !important;
+  font-size: var(--fs-sm);
+  font-weight: 700 !important;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all var(--t-fast);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ffd700' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 10px center !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 215, 0, 0.15) !important;
 }
-.select:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.select:hover, select.select:hover, select:hover {
+  border-color: var(--gold-bright) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px var(--gold-glow), inset 0 1px 0 rgba(255, 215, 0, 0.25) !important;
+}
+
+.select:focus, select.select:focus, select:focus {
+  outline: none;
+  border-color: var(--gold-bright) !important;
+  box-shadow: 0 0 14px var(--gold-glow) !important;
+}
+
+.select:disabled, select.select:disabled, select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: var(--line-strong) !important;
+}
+
+.select option, select.select option, select option {
+  background-color: #141b2d !important;
+  color: #fef08a !important;
+  font-weight: 600;
+  padding: 8px 12px;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    STATUS PRIMITIVES — War trophies & clan badges

@@ -498,7 +498,7 @@ export default function ProblemPage() {
       setRunResult(res.data);
       setSelectedSampleTab(0);
       if (res.data.verdict === 'AC') {
-        addToast(`⚡ Sample Tests Passed (${res.data.samples_passed}/${res.data.samples_total})`, 'success');
+        addToast(`Sample Tests Passed (${res.data.samples_passed}/${res.data.samples_total})`, 'success');
       } else if (res.data.verdict === 'CE') {
         addToast('Spell Error on sample tests', 'error');
       } else {
@@ -530,7 +530,7 @@ export default function ProblemPage() {
       setSubmissions((prev) => [res.data, ...prev]);
       window.dispatchEvent(new Event('submission:created'));
       if (res.data.verdict === 'IE') addToast('The war council is unavailable. Please resubmit.', 'error');
-      else if (res.data.verdict === 'AC') addToast(`⚔️ Victory! +${res.data.score} pts`, 'success');
+      else if (res.data.verdict === 'AC') addToast(`Victory! +${res.data.score} pts`, 'success');
       else if (res.data.score > 0) addToast(`Partial conquest: +${res.data.score} pts`, 'info');
       // The one official attempt is spent (a judge error is not the team's fault, so it isn't)
       if (res.data.verdict !== 'IE') { setSealed(true); clearDraft(owner, slug); }
@@ -620,7 +620,7 @@ export default function ProblemPage() {
               <Difficulty value={problem.difficulty} />
               {problem.best_time_complexity && (
                 <span className="meta" title="Optimal Asymptotic Complexity">
-                  <span style={{ color: 'var(--gold-bright)', fontWeight: 700 }}>⚡ Optimal:</span>
+                  <span style={{ color: 'var(--gold-bright)', fontWeight: 700 }}>Optimal:</span>
                   <span className="mono" style={{ color: 'var(--gold-bright)', fontWeight: 700 }}>{problem.best_time_complexity}</span>
                 </span>
               )}
@@ -644,7 +644,7 @@ export default function ProblemPage() {
                 </article>
                 {problem.sample_test_cases.length > 0 && !/sample/i.test(problem.statement) && (
                   <div className="samples">
-                    <h2 className="samples-title">⚔️ Sample Battles</h2>
+                    <h2 className="samples-title">Sample Battles</h2>
                     {problem.sample_test_cases.map((tc, i) => (
                       <div className="sample" key={i}>
                         <div>
@@ -715,7 +715,6 @@ export default function ProblemPage() {
             )}
             <label htmlFor="language-select" className="sr-only">Weapon</label>
             <div className="lang-picker">
-              <span className="lang-picker-icon" aria-hidden="true">⚔️</span>
               <select id="language-select" className="select lang-select" value={lang} onChange={(e) => setLang(e.target.value)} disabled={submitting || editorLocked}>
                 {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
               </select>
@@ -747,14 +746,14 @@ export default function ProblemPage() {
               title={isContestEnded ? 'Contest has ended. Submissions are closed.' : sealed ? 'One submission per quest — already used.' : 'Attack once (Ctrl+Enter) — only one submission is allowed per quest'}
             >
               {isContestEnded
-                ? '⏱ Contest Ended'
+                ? 'Contest Ended'
                 : sealed
                   ? <><Icon name="check" size={14} /> Submitted</>
                 : submitting
                   ? <><span className="spinner" /> Battling…</>
                 : armed
                   ? <>Confirm · final attempt</>
-                  : <>⚔️ Attack <kbd>Ctrl ↵</kbd></>
+                  : <>Attack <kbd>Ctrl ↵</kbd></>
               }
             </button>
             <span className="sr-only" role="status">{armed ? 'Press again to confirm. Only one submission is allowed for this quest.' : ''}</span>
@@ -807,7 +806,7 @@ export default function ProblemPage() {
           {running && (
             <div className="verdict-strip" role="status">
               <div className="strip-row">
-                <span className="strip-verdict tone-pending"><span className="spinner" /> ⚡ Testing…</span>
+                <span className="strip-verdict tone-pending"><span className="spinner" /> Testing…</span>
                 <span className="strip-score">Testing your weapon against sample cases…</span>
               </div>
             </div>
@@ -817,7 +816,7 @@ export default function ProblemPage() {
               <div className="console-head">
                 <div className="console-title">
                   <span className={`verdict-tag verdict-${runResult.verdict.toLowerCase()}`}>
-                    {runResult.verdict === 'AC' ? '✓ Passed' : runResult.verdict === 'CE' ? 'Spell Error' : runResult.verdict}
+                    {runResult.verdict === 'AC' ? 'Passed' : runResult.verdict === 'CE' ? 'Spell Error' : runResult.verdict}
                   </span>
                   <span className="console-summary">
                     Sample Tests: <b>{runResult.samples_passed}/{runResult.samples_total}</b> passed
@@ -851,7 +850,7 @@ export default function ProblemPage() {
                         fontSize: 11,
                       }}
                     >
-                      ⚡ Time: {runResult.time_complexity} ({runResult.time_complexity_verdict})
+                      Time: {runResult.time_complexity} ({runResult.time_complexity_verdict})
                     </span>
                   )}
                 </div>
@@ -878,7 +877,7 @@ export default function ProblemPage() {
                         aria-selected={selectedSampleTab === idx}
                         onClick={() => setSelectedSampleTab(idx)}
                       >
-                        <span className="status-dot">{r.passed ? '✓' : '✗'}</span> Case {r.sample_index}
+                        <span className={`status-dot ${r.passed ? 'status-pass' : 'status-fail'}`}>{r.passed ? 'PASS' : 'FAIL'}</span> Case {r.sample_index}
                         {r.runtime_ms != null && <span className="tab-ms">{fmtRuntime(r.runtime_ms)}</span>}
                       </button>
                     ))}
@@ -930,7 +929,7 @@ export default function ProblemPage() {
           {submitting && (
             <div className="verdict-strip" role="status">
               <div className="strip-row">
-                <span className="strip-verdict tone-pending"><span className="spinner" /> ⚔️ Battling</span>
+                <span className="strip-verdict tone-pending"><span className="spinner" /> Battling</span>
                 <span className="strip-score">Your warriors are fighting through every test case…</span>
               </div>
             </div>
@@ -979,7 +978,7 @@ export default function ProblemPage() {
                         fontSize: 11,
                       }}
                     >
-                      ⚡ Complexity: {lastResult.time_complexity}{' '}
+                      Complexity: {lastResult.time_complexity}{' '}
                       {lastResult.time_complexity_verdict === 'OPTIMAL'
                         ? '(Optimal)'
                         : lastResult.time_complexity_verdict === 'ACCEPTABLE'

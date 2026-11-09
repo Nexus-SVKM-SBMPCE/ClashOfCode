@@ -14,7 +14,7 @@ function BatchTimer() {
   if (status === 'loading') {
     return (
       <div className="batch-timer batch-timer--loading" aria-label="Loading timer">
-        <span className="timer-icon">⏱</span>
+        <span className="timer-icon"><Icon name="clock" size={13} /></span>
         <span className="timer-display">--:--:--</span>
       </div>
     );
@@ -27,7 +27,7 @@ function BatchTimer() {
   if (status === 'NOT_STARTED') {
     return (
       <div className="batch-timer batch-timer--waiting" title={batchName}>
-        <span className="timer-icon">⏳</span>
+        <span className="timer-icon"><Icon name="clock" size={13} /></span>
         <span className="timer-display timer-waiting">Waiting…</span>
       </div>
     );
@@ -36,7 +36,7 @@ function BatchTimer() {
   if (status === 'COMPLETED') {
     return (
       <div className="batch-timer batch-timer--ended" title={batchName}>
-        <span className="timer-icon">🏁</span>
+        <span className="timer-icon"><Icon name="check" size={13} /></span>
         <span className="timer-display timer-ended">00:00:00</span>
       </div>
     );
@@ -50,7 +50,7 @@ function BatchTimer() {
       aria-label={`Time remaining: ${displayTime}`}
       aria-live="polite"
     >
-      <span className="timer-icon">⚡</span>
+      <span className="timer-icon"><Icon name="clock" size={13} /></span>
       <span className={`timer-display${isPulsing ? ' timer-pulsing' : ''}`}>
         {displayTime}
       </span>
@@ -67,7 +67,7 @@ function ViolationPill() {
     <div className={`tab-switch-pill${tone}`} role="status"
       title="Security violations on your attempt — visible to the administrator. 3 locks your session."
       aria-label={locked ? 'Contest session locked' : `Violations: ${violations} of ${maxStrikes}`}>
-      <span aria-hidden="true">{locked ? '🔒' : '🛡'}</span>
+      <span aria-hidden="true"><Icon name={locked ? 'alert' : 'check'} size={13} /></span>
       <span>
         <span className="tab-switch-label">{locked ? 'Locked · ' : 'Violations: '}</span>
         {Math.min(violations, maxStrikes)} / {maxStrikes}

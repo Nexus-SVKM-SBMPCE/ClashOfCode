@@ -204,7 +204,12 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Gold shimmer on login form, floating ember radial gradients, drifting battlefield fog
   - [x] Shield solve animation (3D flip), sword slash logo entrance, glow pulse
   - [x] All transitions respect `prefers-reduced-motion: reduce`
-- Verification: `npm run build` exit 0, `python backend/test_import.py` exit 0, all pages verified
+- [x] **Clash Regular Heading Font & UI Polish (Round 2)**:
+  - [x] Integrated authentic Supercell `Clash Regular` font (`/fonts/Clash-Regular.otf` & `.ttf`) with `@font-face`
+  - [x] Applied `var(--font-heading)` exclusively to all headings (`h1`–`h6`, `.page-title`, `.title`, `.card-title`, `.modal-title`, etc.) across all pages
+  - [x] Replaced admin dropdown boxes (`LeaderboardPage.tsx`, `QuestForge.tsx`) with 3D beveled gold theme matching the code editor language selector
+  - [x] Completely removed all emojis from code editor (`ProblemPage.tsx`), admin dashboards, and navbar (0 emojis remaining across `frontend/src`)
+- Verification: `npm run build` exit 0, `npm run test` (11 test files, 91 tests) pass, all pages verified
 
 ### Sanchita's Tracker (`branch: sanchita`)
 - [x] **Per-Batch 1-Hour Countdown Timer** *(Phase 1 — COMPLETE)*:
