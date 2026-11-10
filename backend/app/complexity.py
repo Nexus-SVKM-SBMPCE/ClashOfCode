@@ -106,6 +106,54 @@ class PythonASTComplexityAnalyzer(ast.NodeVisitor):
             return all(isinstance(elt, ast.Constant) for elt in node.elts)
         return False
 
+    def _get_expr_degree(self, node: ast.AST) -> int:
+        """Estimate the polynomial degree of an expression in terms of N."""
+        if isinstance(node, (ast.Constant, ast.UnaryOp)):
+            return 0
+        if isinstance(node, ast.Name):
+            return 1
+        if isinstance(node, ast.Call):
+            func_name = ""
+            if isinstance(node.func, ast.Name):
+                func_name = node.func.id
+            if func_name == "len":
+                return 1
+            if func_name == "pow" and len(node.args) >= 2:
+                base_deg = self._get_expr_degree(node.args[0]) or 1
+                if isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, (int, float)):
+                    return int(base_deg * node.args[1].value)
+                return base_deg * 2
+            return 1
+        if isinstance(node, ast.BinOp):
+            if isinstance(node.op, ast.Mult):
+                d1 = self._get_expr_degree(node.left)
+                d2 = self._get_expr_degree(node.right)
+                return (d1 + d2) if (d1 > 0 and d2 > 0) else max(d1, d2, 1)
+            if isinstance(node.op, ast.Pow):
+                base_deg = self._get_expr_degree(node.left) or 1
+                if isinstance(node.right, ast.Constant) and isinstance(node.right.value, (int, float)):
+                    return int(base_deg * node.right.value)
+                return base_deg * 2
+            if isinstance(node.op, ast.BitXor):
+                # Common math convention where user writes n^2 meaning n squared
+                base_deg = self._get_expr_degree(node.left) or 1
+                if isinstance(node.right, ast.Constant) and node.right.value in (2, 3, 4):
+                    return int(base_deg * node.right.value)
+                return max(self._get_expr_degree(node.left), self._get_expr_degree(node.right), 1)
+            if isinstance(node.op, (ast.Add, ast.Sub)):
+                return max(self._get_expr_degree(node.left), self._get_expr_degree(node.right))
+        return 1
+
+    def _get_loop_degree(self, iter_node: ast.AST) -> int:
+        if self._is_constant_bound(iter_node):
+            return 0
+        if isinstance(iter_node, ast.Call):
+            if isinstance(iter_node.func, ast.Name) and iter_node.func.id == "range":
+                if iter_node.args:
+                    limit_arg = iter_node.args[-1] if len(iter_node.args) <= 2 else iter_node.args[1]
+                    return max(1, self._get_expr_degree(limit_arg))
+        return 1
+
     def visit_FunctionDef(self, node: ast.FunctionDef):
         prev_func = self.current_func_name
         self.current_func_name = node.name
@@ -131,17 +179,17 @@ class PythonASTComplexityAnalyzer(ast.NodeVisitor):
         self.current_func_name = prev_func
 
     def visit_For(self, node: ast.For):
-        is_const = self._is_constant_bound(node.iter)
+        deg = self._get_loop_degree(node.iter)
 
-        if not is_const:
-            self.linear_loop_depth += 1
+        if deg > 0:
+            self.linear_loop_depth += deg
             if self.linear_loop_depth > self.max_linear_depth:
                 self.max_linear_depth = self.linear_loop_depth
 
         self.generic_visit(node)
 
-        if not is_const:
-            self.linear_loop_depth -= 1
+        if deg > 0:
+            self.linear_loop_depth -= deg
 
     def visit_While(self, node: ast.While):
         # Analyze loop step to detect logarithmic vs linear progression
@@ -161,7 +209,13 @@ class PythonASTComplexityAnalyzer(ast.NodeVisitor):
             if self.log_loop_depth > self.max_log_depth:
                 self.max_log_depth = self.log_loop_depth
         else:
-            self.linear_loop_depth += 1
+            # Check if while condition tests a polynomial bound: while i < n * n or while i < n ** 2
+            deg = 1
+            if isinstance(node.test, ast.Compare):
+                for comp in node.test.comparators:
+                    deg = max(deg, self._get_expr_degree(comp))
+
+            self.linear_loop_depth += deg
             if self.linear_loop_depth > self.max_linear_depth:
                 self.max_linear_depth = self.linear_loop_depth
 
@@ -170,7 +224,44 @@ class PythonASTComplexityAnalyzer(ast.NodeVisitor):
         if is_logarithmic:
             self.log_loop_depth -= 1
         else:
-            self.linear_loop_depth -= 1
+            deg = 1
+            if isinstance(node.test, ast.Compare):
+                for comp in node.test.comparators:
+                    deg = max(deg, self._get_expr_degree(comp))
+            self.linear_loop_depth -= deg
+
+    def _handle_comprehension(self, generators: List[ast.comprehension]):
+        total_deg = 0
+        for gen in generators:
+            deg = self._get_loop_degree(gen.iter)
+            total_deg += deg
+
+        if total_deg > 0:
+            self.linear_loop_depth += total_deg
+            if self.linear_loop_depth > self.max_linear_depth:
+                self.max_linear_depth = self.linear_loop_depth
+
+        return total_deg
+
+    def visit_ListComp(self, node: ast.ListComp):
+        deg = self._handle_comprehension(node.generators)
+        self.generic_visit(node)
+        self.linear_loop_depth -= deg
+
+    def visit_SetComp(self, node: ast.SetComp):
+        deg = self._handle_comprehension(node.generators)
+        self.generic_visit(node)
+        self.linear_loop_depth -= deg
+
+    def visit_DictComp(self, node: ast.DictComp):
+        deg = self._handle_comprehension(node.generators)
+        self.generic_visit(node)
+        self.linear_loop_depth -= deg
+
+    def visit_GeneratorExp(self, node: ast.GeneratorExp):
+        deg = self._handle_comprehension(node.generators)
+        self.generic_visit(node)
+        self.linear_loop_depth -= deg
 
     def visit_Call(self, node: ast.Call):
         func_name = ""

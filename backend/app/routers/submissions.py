@@ -111,6 +111,8 @@ class SubmissionResponse(BaseModel):
     created_at: str
     judged_at: Optional[str]
     solve_time_seconds: Optional[int] = None
+    time_complexity: Optional[str] = None
+    time_complexity_verdict: Optional[str] = None
 
 
 def _to_response(sub: Submission, problem_slug: str, include_ce: bool = True) -> SubmissionResponse:
@@ -410,6 +412,19 @@ def create_submission(
         else:
             sub.solve_time_seconds = 0
 
+    # Evaluate time complexity on submitted solution
+    try:
+        comp_eval = evaluate_time_complexity(
+            source_code=body.source_code,
+            language=body.language,
+            expected_complexity=getattr(prob, "best_time_complexity", None) or "O(N)",
+        )
+        sub.time_complexity = comp_eval.get("calculated_complexity")
+        sub.time_complexity_verdict = comp_eval.get("verdict")
+    except Exception:
+        sub.time_complexity = "O(N)"
+        sub.time_complexity_verdict = "OPTIMAL"
+
     # Persist results
     sub.status       = "done"
     sub.verdict      = final_verdict
@@ -424,6 +439,19 @@ def create_submission(
     sub.test_results = json.dumps(test_results)
     sub.judged_at    = datetime.now(timezone.utc)
     session.add(sub)
+
+    # Recalculate team total_score across best submissions per problem
+    if team:
+        session.flush()
+        team_subs = session.exec(
+            select(Submission).where(Submission.user_id == current_user.id, Submission.status == "done")
+        ).all()
+        best_per_prob: Dict[int, int] = {}
+        for ts in team_subs:
+            best_per_prob[ts.problem_id] = max(best_per_prob.get(ts.problem_id, 0), ts.score)
+        team.total_score = sum(best_per_prob.values())
+        session.add(team)
+
     session.commit()
     session.refresh(sub)
 

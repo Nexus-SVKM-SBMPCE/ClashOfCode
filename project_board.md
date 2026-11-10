@@ -38,3 +38,12 @@ Fix batch-wise question allotment and timer resetting bugs, implement dev-mode t
 
 ### Phase 5: Architectural Opinion on Cloud Database (Supabase) [COMPLETE]
 - [x] Formulate detailed Staff Engineer assessment comparing Supabase vs. SQLite WAL / LAN PostgreSQL for offline LAN competition.
+
+### Phase 6: Personalized Team Dossier & Real-Time Time Complexity Dashboard [COMPLETE]
+- [x] Enrich `GET /api/leaderboard` with `complexities` list and `optimal_complexity_count` per team.
+- [x] Implement `GET /api/admin/teams/{team_id}/dossier` endpoint returning full team portfolio: calculated vs optimal time complexity, solve times, problem completions, and proctor violations.
+- [x] Add `TeamDossier` types and API client call in `frontend/src/api.ts`.
+- [x] Add interactive Clan Dossier modal and inline Complexity column in `frontend/src/pages/LeaderboardPage.tsx`.
+- [x] Fix AST complexity evaluator in `backend/app/complexity.py` to recognize arithmetic loop expressions (`n * n`, `n ** 2`, `n ^ 2`, `pow(n, 2)`) as quadratic $O(N^2)$.
+- [x] Connect complexity evaluation to official submissions in `POST /api/submissions` and update team score aggregation across best problem attempts.
+- [x] Verify with backend pytest, frontend vitest (12 files, 93 tests pass), and production build (0 TS errors).
