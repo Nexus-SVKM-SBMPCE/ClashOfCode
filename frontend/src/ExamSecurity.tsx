@@ -66,7 +66,7 @@ function ContestantSecurity({ userId, onState }: { userId: number | string; onSt
   }, [report]);
   // Scoped by lifecycle: only attached while enforcing, which is only ever true for an
   // acknowledged contestant on a contest route during a live batch.
-  useCopyPasteGuard(enforcing ? document.body : null, enforcing, onClipboardBlocked);
+  useCopyPasteGuard(enforcing ? document.body : null, enforcing, onClipboardBlocked, { scope: String(userId) });
 
   useEffect(() => {
     onState({ monitoring: enforcing, violations: monitor.count, maxStrikes: monitor.maxStrikes, locked: monitor.locked });

@@ -6,6 +6,7 @@
  * read the notice, and which violation reports still need to reach the server.
  */
 import type { ViolationType } from '../api';
+import { clearTrustedClipboard } from './trustedClipboard';
 
 const NOTICE_PREFIX = 'exam-notice-ack:';
 const PENDING_PREFIX = 'exam-pending-violations:';
@@ -39,6 +40,7 @@ export const writePending = (userId: number | string, list: PendingViolation[]) 
 
 /** Called on sign-out: the next login sees the notice again. Strikes live on the server and are NOT reset. */
 export function clearExamSecuritySession() {
+  clearTrustedClipboard();
   try {
     for (let i = sessionStorage.length - 1; i >= 0; i--) {
       const key = sessionStorage.key(i);
