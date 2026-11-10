@@ -1565,7 +1565,8 @@ kbd { font-size: 10px; padding: 0 4px; border-radius: 3px; border: 1px solid var
 /* ── Page container ── */
 .page-leaderboard {
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* ── Background image with overlay ── */
