@@ -27,6 +27,7 @@ vi.mock('./api', () => ({
   getBatchProblems: vi.fn(),
   setBatchProblems: vi.fn(),
   autoAllotBatchProblems: vi.fn(),
+  getTeamDossier: vi.fn().mockResolvedValue({ data: null }),
   demoMode: { enabled: false },
 }));
 

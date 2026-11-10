@@ -16,6 +16,7 @@ import {
 } from '../api';
 import QuestForge from '../components/QuestForge';
 import SecurityMonitorPanel from '../components/SecurityMonitorPanel';
+import ClanDossierModal from '../components/ClanDossierModal';
 import type { LeaderboardEntry, BatchAdminInfo, TeamAdminInfo, BatchProblemAdminInfo, TelemetryItem } from '../api';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../Toast';
@@ -33,6 +34,7 @@ export default function LeaderboardPage() {
   const [selectedBatchId, setSelectedBatchId] = useState<number | undefined>(undefined);
   const [dashboardView, setDashboardView] = useState<'combined' | 'standings' | 'telemetry'>('combined');
   const [resettingBatchId, setResettingBatchId] = useState<number | null>(null);
+  const [selectedDossierTeam, setSelectedDossierTeam] = useState<{ id: number; name: string } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -471,6 +473,7 @@ export default function LeaderboardPage() {
                     <th className="align-right col-score">Score</th>
                     <th className="align-right col-conquered">Conquered</th>
                     <th className="align-right col-attacks">Attacks</th>
+                    <th className="align-center col-complexity">⚡ Complexity</th>
                     <th className="align-right col-victory">Last Victory</th>
                   </tr>
                 </thead>
@@ -482,6 +485,7 @@ export default function LeaderboardPage() {
                       <td className="align-right col-score"><span className="skeleton" style={{ width: 40 }} /></td>
                       <td className="align-right col-conquered"><span className="skeleton" style={{ width: 30 }} /></td>
                       <td className="align-right col-attacks"><span className="skeleton" style={{ width: 30 }} /></td>
+                      <td className="align-center col-complexity"><span className="skeleton" style={{ width: 50 }} /></td>
                       <td className="align-right col-victory"><span className="skeleton" style={{ width: 60 }} /></td>
                     </tr>
                   ))}
@@ -499,13 +503,59 @@ export default function LeaderboardPage() {
                           </span>
                         </td>
                         <td className="col-clan">
-                          <div className="team">
-                            <span className="team-name">{e.display_name}{isYou && <span className="you-tag">YOU</span>}</span>
+                          <div
+                            className="team"
+                            onClick={() => setSelectedDossierTeam({ id: e.team_id || e.user_id, name: e.display_name })}
+                            style={{ cursor: 'pointer' }}
+                            title="Click to inspect personalized Clan Dossier & complexity breakdown"
+                          >
+                            <span className="team-name" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              {e.display_name}
+                              <span style={{ fontSize: '11px', opacity: 0.6 }} title="Inspect Dossier">🔍</span>
+                              {isYou && <span className="you-tag">YOU</span>}
+                            </span>
                           </div>
                         </td>
                         <td className="align-right col-score"><span className="score mono">{e.total_score}</span></td>
                         <td className="align-right col-conquered mono">{e.solved_count}</td>
                         <td className="align-right col-attacks mono">{e.total_submissions}</td>
+                        <td className="align-center col-complexity" style={{ verticalAlign: 'middle' }}>
+                          {(() => {
+                            const validComps = (e.complexities || []).filter((c) => c.complexity && c.complexity !== '—');
+                            if (validComps.length === 0) {
+                              return <span className="mono" style={{ color: 'var(--text-3)', fontSize: '12px' }}>—</span>;
+                            }
+                            const isOptimal = (e.optimal_complexity_count || 0) > 0;
+                            return (
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => setSelectedDossierTeam({ id: e.team_id || e.user_id, name: e.display_name })}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  padding: '2px 8px',
+                                  borderRadius: 8,
+                                  background: isOptimal ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                                  border: `1px solid ${isOptimal ? 'var(--ac)' : 'var(--wa)'}`,
+                                  color: isOptimal ? 'var(--ac)' : 'var(--wa)',
+                                  cursor: 'pointer',
+                                }}
+                                title="Click to view full complexity dossier"
+                              >
+                                <span className="mono" style={{ fontWeight: 700, fontSize: '12px' }}>
+                                  ⚡ {validComps[0].complexity}
+                                </span>
+                                {validComps.length > 1 && (
+                                  <span style={{ fontSize: '10px', opacity: 0.8 }}>
+                                    +{validComps.length - 1}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })()}
+                        </td>
                         <td className="align-right col-victory">
                           <span className="last-victory-text">
                             {e.last_ac_time ? new Date(e.last_ac_time).toLocaleTimeString() : '—'}
@@ -515,7 +565,7 @@ export default function LeaderboardPage() {
                     );
                   })}
                   {!loading && board.length === 0 && (
-                    <tr><td colSpan={6}><div className="state"><p className="state-title">No clans on the battlefield yet</p><p>War rankings appear as soon as clans begin their attacks.</p></div></td></tr>
+                    <tr><td colSpan={7}><div className="state"><p className="state-title">No clans on the battlefield yet</p><p>War rankings appear as soon as clans begin their attacks.</p></div></td></tr>
                   )}
                 </tbody>
               </table>
@@ -568,8 +618,15 @@ export default function LeaderboardPage() {
                           : 'rgba(74, 222, 128, 0.15)';
                       return (
                         <tr key={t.team_id}>
-                          <td>
-                            <strong>{t.team_name}</strong>
+                          <td
+                            onClick={() => setSelectedDossierTeam({ id: t.team_id, name: t.team_name })}
+                            style={{ cursor: 'pointer' }}
+                            title="Click to inspect personalized Clan Dossier & complexity breakdown"
+                          >
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              <strong>{t.team_name}</strong>
+                              <span style={{ fontSize: '11px', opacity: 0.6 }}>🔍</span>
+                            </div>
                             <div className="mono" style={{ fontSize: '11px', color: 'var(--gold)' }}>
                               {t.username}
                             </div>
@@ -1065,6 +1122,15 @@ export default function LeaderboardPage() {
               </div>
             </div>
           </>
+        )}
+
+        {/* Personalized Clan Dossier & Algorithmic Complexity Modal */}
+        {selectedDossierTeam && (
+          <ClanDossierModal
+            teamId={selectedDossierTeam.id}
+            clanName={selectedDossierTeam.name}
+            onClose={() => setSelectedDossierTeam(null)}
+          />
         )}
       </div>
     </div>

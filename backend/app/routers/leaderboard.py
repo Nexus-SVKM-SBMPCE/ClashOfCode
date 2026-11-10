@@ -9,6 +9,7 @@ from sqlmodel import Session, select, func
 from fastapi import APIRouter, Depends
 
 from app.auth import require_admin
+from app.complexity import evaluate_time_complexity
 from app.database import get_session
 from app.models import Submission, Problem, User, Team
 
@@ -43,6 +44,7 @@ def get_leaderboard(
     # Get all problems
     problems = session.exec(select(Problem).where(Problem.is_visible == True)).all()  # noqa: E712
     problem_ids = {p.id for p in problems}
+    problem_by_id = {p.id: p for p in problems}
 
     # For each user, calculate best submission per problem
     rows = []
@@ -65,11 +67,31 @@ def get_leaderboard(
         for sub in user_subs:
             pid = sub.problem_id
             cur = best_score.get(pid)
+
+            # Resolve time complexity if not already stored
+            tc = getattr(sub, "time_complexity", None)
+            tc_v = getattr(sub, "time_complexity_verdict", None)
+            if not tc and getattr(sub, "source_code", None):
+                p_obj = problem_by_id.get(pid)
+                exp_c = getattr(p_obj, "best_time_complexity", None) or "O(N)"
+                try:
+                    c_eval = evaluate_time_complexity(sub.source_code, sub.language, exp_c)
+                    tc = c_eval.get("calculated_complexity")
+                    tc_v = c_eval.get("verdict")
+                except Exception:
+                    tc = None
+                    tc_v = None
+
             if sub.score > 0 and (
                 cur is None or sub.score > cur["score"]
                 or (sub.score == cur["score"] and sub.created_at < cur["time"])
             ):
-                best_score[pid] = {"score": sub.score, "time": sub.created_at}
+                best_score[pid] = {
+                    "score": sub.score,
+                    "time": sub.created_at,
+                    "time_complexity": tc,
+                    "time_complexity_verdict": tc_v,
+                }
             if sub.verdict == "AC":
                 # Keep earliest AC per problem (first successful solve time considered)
                 if pid not in solved_problems or sub.created_at < solved_problems[pid]["time"]:
@@ -77,6 +99,8 @@ def get_leaderboard(
                         "time": sub.created_at,
                         "runtime_ms": sub.runtime_ms,
                         "solve_time_seconds": sub.solve_time_seconds or 0,
+                        "time_complexity": tc,
+                        "time_complexity_verdict": tc_v,
                     }
 
         total_score = sum(v["score"] for v in best_score.values())
@@ -91,6 +115,19 @@ def get_leaderboard(
             if best_score else None
         )
 
+        # Collect complexities from solved problems or best attempted submissions
+        target_dict = solved_problems if solved_problems else best_score
+        complexities = [
+            {
+                "problem_id": pid,
+                "complexity": v.get("time_complexity") or "O(N)",
+                "verdict": v.get("time_complexity_verdict") or "UNKNOWN",
+            }
+            for pid, v in target_dict.items()
+            if v.get("time_complexity") and v.get("time_complexity") != "—"
+        ]
+        optimal_complexity_count = sum(1 for c in complexities if c["verdict"] == "OPTIMAL")
+
         rows.append({
             "user_id": user.id,
             "username": user.username,
@@ -102,6 +139,8 @@ def get_leaderboard(
             "total_submissions": total_submissions,
             "last_ac_time": last_ac_time,
             "total_solve_time_seconds": total_solve_time,
+            "complexities": complexities,
+            "optimal_complexity_count": optimal_complexity_count,
             "_last_score_time": last_score_time,
         })
 

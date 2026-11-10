@@ -163,6 +163,58 @@ export interface LeaderboardEntry {
   solved_count: number;
   total_submissions: number;
   last_ac_time: string | null;
+  complexities?: { problem_id: number; complexity: string; verdict: string }[];
+  optimal_complexity_count?: number;
+}
+
+export interface TeamDossierProblem {
+  problem_id: number;
+  problem_title: string;
+  problem_slug: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  best_expected_complexity: string;
+  latest_submission_id: number;
+  verdict: string;
+  score: number;
+  test_score: number;
+  bonus_points: number;
+  tests_passed: number;
+  tests_total: number;
+  language: string;
+  runtime_ms: number | null;
+  memory_kb: number | null;
+  solve_time_seconds: number | null;
+  time_complexity: string;
+  time_complexity_verdict: string;
+  total_attempts: number;
+  created_at: string | null;
+}
+
+export interface TeamDossier {
+  team: {
+    id: number;
+    name: string;
+    username: string;
+    leader_name: string;
+    leader_email: string;
+    members_info?: string | null;
+    batch_id: number | null;
+    batch_name: string;
+    batch_status: string;
+    total_score: number;
+    last_active_at: string | null;
+    created_at: string | null;
+  };
+  security: {
+    integrity_status: 'CLEAN' | 'CAUTION' | 'FLAGGED';
+    tab_switch_count: number;
+    fullscreen_exit_count: number;
+    lock_status: 'ACTIVE' | 'LOCKED';
+    locked_at: string | null;
+  };
+  submissions_count: number;
+  solved_count: number;
+  problems: TeamDossierProblem[];
 }
 
 export interface TeamAdminInfo {
@@ -362,6 +414,83 @@ export const assignTeamBatch = (team_id: number, batch_id: number | null) => {
 export const autoAllotBatches = (teams_per_batch?: number, batch_ids?: number[]) => {
   if (demoMode.enabled) return mockResp({ message: 'Allotted', allotted_count: 4 });
   return api.post('/api/admin/batches/allot', { teams_per_batch, batch_ids });
+};
+
+export const getTeamDossier = (teamId: number) => {
+  if (demoMode.enabled) {
+    return mockResp<TeamDossier>({
+      team: {
+        id: teamId,
+        name: 'Alpha Clan',
+        username: 'team1',
+        leader_name: 'Alice Chen',
+        leader_email: 'alice@clash.local',
+        members_info: JSON.stringify([{ name: 'Alice Chen' }, { name: 'Bob Lin' }]),
+        batch_id: 1,
+        batch_name: 'Batch 1',
+        batch_status: 'ACTIVE',
+        total_score: 300,
+        last_active_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      },
+      security: {
+        integrity_status: 'CLEAN',
+        tab_switch_count: 1,
+        fullscreen_exit_count: 0,
+        lock_status: 'ACTIVE',
+        locked_at: null,
+      },
+      submissions_count: 5,
+      solved_count: 2,
+      problems: [
+        {
+          problem_id: 1,
+          problem_title: 'Two Sum',
+          problem_slug: 'two-sum',
+          difficulty: 'easy',
+          best_expected_complexity: 'O(N)',
+          latest_submission_id: 101,
+          verdict: 'AC',
+          score: 102,
+          test_score: 100,
+          bonus_points: 2,
+          tests_passed: 10,
+          tests_total: 10,
+          language: 'python',
+          runtime_ms: 32.5,
+          memory_kb: 14200,
+          solve_time_seconds: 140,
+          time_complexity: 'O(N)',
+          time_complexity_verdict: 'OPTIMAL',
+          total_attempts: 1,
+          created_at: new Date().toISOString(),
+        },
+        {
+          problem_id: 2,
+          problem_title: 'Binary Search',
+          problem_slug: 'binary-search',
+          difficulty: 'easy',
+          best_expected_complexity: 'O(log N)',
+          latest_submission_id: 102,
+          verdict: 'AC',
+          score: 102,
+          test_score: 100,
+          bonus_points: 2,
+          tests_passed: 10,
+          tests_total: 10,
+          language: 'cpp',
+          runtime_ms: 12.1,
+          memory_kb: 4200,
+          solve_time_seconds: 320,
+          time_complexity: 'O(log N)',
+          time_complexity_verdict: 'OPTIMAL',
+          total_attempts: 2,
+          created_at: new Date().toISOString(),
+        },
+      ],
+    });
+  }
+  return api.get<TeamDossier>(`/api/admin/teams/${teamId}/dossier`);
 };
 
 export interface BatchProblemAdminInfo {
