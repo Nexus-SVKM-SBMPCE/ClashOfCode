@@ -383,6 +383,25 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
 | `frontend/src/ExamSecurity.test.tsx` | **New** | 30 tests: guard, strike 1→2→3, one action = one strike, refresh / cancelled unload, offline retry, notice 10 s lock, admin/logged-out untouched, lock restore |
 | `PROJECTBOARD.md` | Modified | This tracking |
 
+#### Vatsal — Round 5 (2026-11-09): Selective copy-paste (editor code allowed)
+- [x] **Editor copy / cut allowed**: Ctrl/⌘+C, X, V, A, Z, Y work inside the Monaco editor for contestants. Copy and cut there never warn and never add a strike. Copied code is saved to a per-contestant "trusted clipboard" (last 25 snippets, kept in sessionStorage so it survives question switches and refresh, cleared on sign-out)
+- [x] **Cross-question reuse**: code copied in Quest 1 pastes into Quest 2 (trusted list is shared across editor instances)
+- [x] **External paste blocked**: paste into the editor is allowed only when the clipboard text matches a trusted snippet (line endings and trailing spaces ignored); anything else is blocked and reported as `PASTE_ATTEMPT` through the existing strike flow. Paste via `beforeinput` that no vetted paste event approved is blocked too. Drag/drop stays blocked everywhere
+- [x] **Question content unchanged**: statement text still unselectable; copy, cut, right-click and drag on question text still blocked and reported
+- [x] **Unchanged**: notice + 10 s countdown, fullscreen, tab-switch, three strikes, lock + logout, admin Security Watch/unlock/reset, backend APIs, timer, Run/Submit, autosave
+- [x] **Tests**: frontend `npm test` → **12 files / 116 pass** (new `TrustedClipboard.test.tsx`, 30 cases); `npm run build` exit 0
+- [ ] **Still to do by hand**: real-browser check in Chrome + Edge (copy in Q1 → paste in Q2, paste from another website → strike)
+- Limits (honest): a web page cannot tell where clipboard text came from. Identical text copied from elsewhere would match, and extensions, devtools, OS automation or a second device are out of reach
+
+| File | Change | Why / what changed |
+| :--- | :--- | :--- |
+| `frontend/src/lib/trustedClipboard.ts` | **New** | Per-contestant list of code copied from the editor, `isTrustedPaste()` check, clear on sign-out, registry for the active editor's selection |
+| `frontend/src/hooks/useCopyPasteGuard.ts` | Modified | Inside `[data-exam-editor]` (when a scope is given): shortcuts pass, copy/cut pass and are recorded, paste only if trusted. Outside the editor nothing changed |
+| `frontend/src/ExamSecurity.tsx` | Modified | Passes the contestant id as the trusted-clipboard scope |
+| `frontend/src/pages/ProblemPage.tsx` | Modified | Marks the editor container `data-exam-editor`; registers Monaco's selection reader on mount |
+| `frontend/src/lib/examSecurity.ts` | Modified | `clearExamSecuritySession()` also clears the trusted clipboard |
+| `frontend/src/TrustedClipboard.test.tsx` | **New** | 30 tests: question protection, editor shortcuts (incl. ⌘), trusted vs external paste, cross-question reuse, per-user scope, sign-out clear |
+
 #### Yash — Round 2 (2026-11-08)
 - [x] **Batch-Wise Allotment & Leakage Resolution**:
   - [x] Fixed `backend/app/routers/problems.py` (`list_problems` & `get_problem`) to strictly enforce batch boundaries when batch problems are configured. Solves empty/unallotted fallback bug where all questions leaked to every batch.
