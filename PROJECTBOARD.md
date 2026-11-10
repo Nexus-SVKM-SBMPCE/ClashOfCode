@@ -209,6 +209,11 @@ A zero-cloud, LAN-accessible competitive programming arena. Single host serves s
   - [x] Applied `var(--font-heading)` exclusively to all headings (`h1`–`h6`, `.page-title`, `.title`, `.card-title`, `.modal-title`, etc.) across all pages
   - [x] Replaced admin dropdown boxes (`LeaderboardPage.tsx`, `QuestForge.tsx`) with 3D beveled gold theme matching the code editor language selector
   - [x] Completely removed all emojis from code editor (`ProblemPage.tsx`), admin dashboards, and navbar (0 emojis remaining across `frontend/src`)
+- [x] **Login Flow & Offline LAN Host Alignment**:
+  - [x] Restored active demo clan credentials buttons on login portal (`LoginPage.tsx`)
+  - [x] Removed invasive automatic browser fullscreen on form submit
+  - [x] Configured backend CORS regex to accept all local LAN origins (`r"https?://.*"`)
+  - [x] Dynamically resolved API `BASE_URL` to the client host for cross-device LAN arena play (`api.ts`)
 - Verification: `npm run build` exit 0, `npm run test` (11 test files, 91 tests) pass, all pages verified
 
 ### Sanchita's Tracker (`branch: sanchita`)

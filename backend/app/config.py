@@ -12,12 +12,12 @@ ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "720"))
 JUDGE0_URL: str = os.getenv("JUDGE0_URL", "http://127.0.0.1:2358")
 
-_cors_raw = os.getenv("CORS_ORIGINS", *'')
+_cors_raw = os.getenv("CORS_ORIGINS", '["http://localhost:5173", "http://127.0.0.1:5173"]')
 try:
     import json
     CORS_ORIGINS: List[str] = json.loads(_cors_raw)
 except Exception:
-    CORS_ORIGINS = [_cors_raw]
+    CORS_ORIGINS = [_cors_raw] if _cors_raw else ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 # Judge0 language ID mapping — verified via tests/verify_judge0.py (Phase 1)
 JUDGE0_LANGUAGE_IDS = {
