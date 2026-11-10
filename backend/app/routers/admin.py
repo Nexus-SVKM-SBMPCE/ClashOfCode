@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 
 from app.auth import require_admin
 from app.database import get_session
-from app.models import Problem, TestCase, User, Team, Batch, BatchProblem
+from app.models import Problem, TestCase, User, Team, Batch, BatchProblem, Submission
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -245,6 +245,127 @@ def admin_list_teams(
         }
         for t in teams
     ]
+
+
+@router.get("/teams/{team_id}/dossier")
+def admin_get_team_dossier(
+    team_id: int,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> Dict[str, Any]:
+    team = session.get(Team, team_id)
+    if not team:
+        # Fallback if team_id matches a user id
+        user_candidate = session.get(User, team_id)
+        if user_candidate and user_candidate.team_id:
+            team = session.get(Team, user_candidate.team_id)
+        elif user_candidate:
+            team = session.exec(select(Team).where(Team.username == user_candidate.username)).first()
+
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    batch = session.get(Batch, team.batch_id) if team.batch_id else None
+    user = session.exec(select(User).where((User.team_id == team.id) | (User.username == team.username))).first()
+    user_id = user.id if user else None
+
+    problems = {p.id: p for p in session.exec(select(Problem)).all()}
+
+    subs = session.exec(
+        select(Submission)
+        .where(Submission.user_id == user_id)
+        .order_by(Submission.created_at.desc())  # type: ignore[attr-defined]
+    ).all() if user_id else []
+
+    fs_count = team.fullscreen_exit_count or 0
+    tab_count = team.tab_switch_count or 0
+    if fs_count >= 2 or tab_count >= 5:
+        integrity_status = "FLAGGED"
+    elif fs_count >= 1 or tab_count >= 2:
+        integrity_status = "CAUTION"
+    else:
+        integrity_status = "CLEAN"
+
+    lock_status = "ACTIVE"
+    locked_at = None
+    try:
+        from app.models import ContestSecurityState
+        if user_id and team.batch_id:
+            cstate = session.exec(
+                select(ContestSecurityState).where(
+                    ContestSecurityState.user_id == user_id,
+                    ContestSecurityState.batch_id == team.batch_id,
+                )
+            ).first()
+            if cstate:
+                lock_status = cstate.status
+                locked_at = cstate.locked_at.isoformat() if cstate.locked_at else None
+    except Exception:
+        pass
+
+    # Group by problem to show each problem's best or latest solution and complexity
+    problem_cards = []
+    grouped: Dict[int, List[Submission]] = {}
+    for s in subs:
+        grouped.setdefault(s.problem_id, []).append(s)
+
+    for pid, psubs in grouped.items():
+        prob = problems.get(pid)
+        best_sub = next((s for s in psubs if s.verdict == "AC"), None)
+        if not best_sub:
+            best_sub = max(psubs, key=lambda s: s.score)
+
+        problem_cards.append({
+            "problem_id": pid,
+            "problem_title": prob.title if prob else f"Problem #{pid}",
+            "problem_slug": prob.slug if prob else "",
+            "difficulty": prob.difficulty if prob else "medium",
+            "best_expected_complexity": getattr(prob, "best_time_complexity", None) or "O(N)",
+            "latest_submission_id": best_sub.id,
+            "verdict": best_sub.verdict or "PENDING",
+            "score": best_sub.score,
+            "test_score": best_sub.test_score,
+            "bonus_points": best_sub.bonus_points,
+            "tests_passed": best_sub.tests_passed,
+            "tests_total": best_sub.tests_total,
+            "language": best_sub.language,
+            "runtime_ms": best_sub.runtime_ms,
+            "memory_kb": best_sub.memory_kb,
+            "solve_time_seconds": best_sub.solve_time_seconds,
+            "time_complexity": getattr(best_sub, "time_complexity", None) or "—",
+            "time_complexity_verdict": getattr(best_sub, "time_complexity_verdict", None) or "UNKNOWN",
+            "total_attempts": len(psubs),
+            "created_at": best_sub.created_at.isoformat() if best_sub.created_at else None,
+        })
+
+    problem_cards.sort(key=lambda x: (x["verdict"] != "AC", x["problem_title"]))
+
+    return {
+        "team": {
+            "id": team.id,
+            "name": team.name,
+            "username": team.username,
+            "leader_name": team.leader_name,
+            "leader_email": team.leader_email,
+            "members_info": team.members_info,
+            "batch_id": team.batch_id,
+            "batch_name": batch.name if batch else "Unassigned",
+            "batch_status": batch.status if batch else "NOT_STARTED",
+            "total_score": team.total_score,
+            "last_active_at": team.last_active_at.isoformat() if team.last_active_at else None,
+            "created_at": team.created_at.isoformat() if team.created_at else None,
+        },
+        "security": {
+            "integrity_status": integrity_status,
+            "tab_switch_count": tab_count,
+            "fullscreen_exit_count": fs_count,
+            "lock_status": lock_status,
+            "locked_at": locked_at,
+        },
+        "submissions_count": len(subs),
+        "solved_count": sum(1 for c in problem_cards if c["verdict"] == "AC"),
+        "problems": problem_cards,
+    }
 
 
 @router.post("/teams/{team_id}/assign-batch")
