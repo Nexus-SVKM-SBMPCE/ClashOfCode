@@ -7,6 +7,7 @@
  */
 import { useEffect } from 'react';
 import { useCountdownTimer } from './useCountdownTimer';
+import Icon from './components/Icon';
 
 interface WaitingScreenProps {
   onBatchStarted?: () => void;
@@ -29,7 +30,7 @@ export default function WaitingScreen({ onBatchStarted, batchName: propBatchName
   return (
     <div className="waiting-screen">
       <div className="waiting-icon-wrap">
-        <span className="waiting-icon-emoji">🏰</span>
+        <span className="waiting-icon-emoji"><Icon name="clock" size={36} /></span>
       </div>
 
       <h1 className="waiting-title">Waiting for Battle to Begin</h1>

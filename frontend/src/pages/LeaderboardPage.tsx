@@ -67,7 +67,7 @@ export default function LeaderboardPage() {
         name: newBatchName.trim(),
         duration_minutes: newBatchDuration,
       });
-      addToast(`🛡️ ${newBatchName} created successfully!`, 'success');
+      addToast(`${newBatchName} created successfully!`, 'success');
       setShowCreateBatch(false);
       setNewBatchNumber((n) => n + 1);
       setNewBatchName(`Batch ${newBatchNumber + 1}`);
@@ -126,7 +126,7 @@ export default function LeaderboardPage() {
     setResettingBatchId(batchId);
     try {
       await resetBatchTimer(batchId);
-      addToast(`🔄 Timer reset to NOT_STARTED for ${batchName}`, 'info');
+      addToast(`Timer reset to NOT_STARTED for ${batchName}`, 'info');
       window.dispatchEvent(new CustomEvent('batch:timer-reset', { detail: { batch_id: batchId } }));
       await loadBatches();
     } catch (err: any) {
@@ -327,25 +327,25 @@ export default function LeaderboardPage() {
               className={`btn btn-sm ${activeTab === 'rankings' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab('rankings')}
             >
-              ⚔️ War Standings
+              War Standings
             </button>
             <button
               className={`btn btn-sm ${activeTab === 'allotment' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab('allotment')}
             >
-              🛡️ Clan Allotment & Batches
+              Clan Allotment & Batches
             </button>
             <button
               className={`btn btn-sm ${activeTab === 'forge' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab('forge')}
             >
-              ⚒️ Quest Forge & Complexity
+              Quest Forge & Complexity
             </button>
             <button
               className={`btn btn-sm ${activeTab === 'security' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab('security')}
             >
-              🛡 Security Watch
+              Security Watch
             </button>
           </div>
         )}
@@ -370,7 +370,7 @@ export default function LeaderboardPage() {
             >
               <div className="panel" style={{ padding: '14px 18px', borderLeft: '4px solid var(--gold)' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase' }}>
-                  🛡️ Active Battle Clans
+                  Active Battle Clans
                 </span>
                 <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--gold-bright)', marginTop: 4 }}>
                   {board.length} <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-2)' }}>clans</span>
@@ -379,7 +379,7 @@ export default function LeaderboardPage() {
 
               <div className="panel" style={{ padding: '14px 18px', borderLeft: '4px solid var(--ac)' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase' }}>
-                  ⚔️ Total Victories (AC)
+                  Total Victories (AC)
                 </span>
                 <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--ac)', marginTop: 4 }}>
                   {board.reduce((acc, e) => acc + (e.solved_count || 0), 0)} <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-2)' }}>quests solved</span>
@@ -388,7 +388,7 @@ export default function LeaderboardPage() {
 
               <div className="panel" style={{ padding: '14px 18px', borderLeft: '4px solid var(--pending)' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase' }}>
-                  ⚡ Total Attacks Launched
+                  Total Attacks Launched
                 </span>
                 <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--pending)', marginTop: 4 }}>
                   {board.reduce((acc, e) => acc + (e.total_submissions || 0), 0)} <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-2)' }}>attacks</span>
@@ -397,7 +397,7 @@ export default function LeaderboardPage() {
 
               <div className="panel" style={{ padding: '14px 18px', borderLeft: '4px solid var(--wa)' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase' }}>
-                  🚨 Security / Proctor Alerts
+                  Security / Proctor Alerts
                 </span>
                 <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--wa)', marginTop: 4 }}>
                   {telemetry.filter((t) => t.integrity_status === 'FLAGGED').length}{' '}
@@ -420,14 +420,13 @@ export default function LeaderboardPage() {
                 </button>
                 {batches.map((b) => {
                   const isSelected = selectedBatchId === b.id;
-                  const statusDot = b.status === 'ACTIVE' ? '🟢' : b.status === 'COMPLETED' ? '🏁' : '⏳';
                   return (
                     <button
                       key={b.id}
                       className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
                       onClick={() => handleSelectBatch(b.id)}
                     >
-                      {statusDot} {b.name}
+                      {b.name}
                     </button>
                   );
                 })}
@@ -439,19 +438,19 @@ export default function LeaderboardPage() {
                     className={`btn btn-sm ${dashboardView === 'combined' ? 'btn-primary' : 'btn-ghost'}`}
                     onClick={() => setDashboardView('combined')}
                   >
-                    📊 All Intelligence
+                    All Intelligence
                   </button>
                   <button
                     className={`btn btn-sm ${dashboardView === 'standings' ? 'btn-primary' : 'btn-ghost'}`}
                     onClick={() => setDashboardView('standings')}
                   >
-                    🏆 Scores & Ranks
+                    Scores & Ranks
                   </button>
                   <button
                     className={`btn btn-sm ${dashboardView === 'telemetry' ? 'btn-primary' : 'btn-ghost'}`}
                     onClick={() => setDashboardView('telemetry')}
                   >
-                    🛡️ Proctor Surveillance
+                    Proctor Surveillance
                   </button>
                 </div>
               )}
@@ -462,7 +461,7 @@ export default function LeaderboardPage() {
             <div className="panel panel-scroll" style={{ marginBottom: 24 }}>
               <div style={{ padding: '14px 18px 8px', borderBottom: '1px solid var(--line)' }}>
                 <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gold-bright)' }}>
-                  🏆 Battle Standings & Clan Scores
+                  Battle Standings & Clan Scores
                 </h3>
               </div>
               <table className="table board-table">
@@ -497,9 +496,7 @@ export default function LeaderboardPage() {
                         <td className="col-rank">
                           <span className="rank">
                             <span className="rank-mark" aria-hidden="true" />
-                            {e.rank <= 3 && e.total_score > 0 ? (
-                              <span>{e.rank === 1 ? '🥇' : e.rank === 2 ? '🥈' : '🥉'} {e.rank}</span>
-                            ) : e.rank}
+                            <span>{e.rank}</span>
                           </span>
                         </td>
                         <td className="col-clan">
@@ -578,7 +575,7 @@ export default function LeaderboardPage() {
               <div style={{ padding: '14px 18px 8px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--wa)' }}>
-                    🛡️ Clan Anti-Cheat Surveillance & Proctoring Telemetry
+                    Clan Anti-Cheat Surveillance & Proctoring Telemetry
                   </h3>
                   <p style={{ fontSize: '12px', color: 'var(--text-3)' }}>
                     Discrete monitoring of contestant full-screen exits, window tab switches, and live contest activity.
@@ -593,8 +590,8 @@ export default function LeaderboardPage() {
                   <tr>
                     <th>Clan Name</th>
                     <th>Batch</th>
-                    <th className="align-right">🖥️ Fullscreen Exits</th>
-                    <th className="align-right">📑 Tab Switches</th>
+                    <th className="align-right">Fullscreen Exits</th>
+                    <th className="align-right">Tab Switches</th>
                     <th>Integrity Status</th>
                     <th>Leader Info</th>
                     <th className="align-right">Last Active Ping</th>
@@ -647,7 +644,7 @@ export default function LeaderboardPage() {
                                   fontWeight: 700,
                                 }}
                               >
-                                ⚠️ {t.fullscreen_exit_count} exits
+                                {t.fullscreen_exit_count} exits
                               </span>
                             ) : (
                               <span className="mono" style={{ color: 'var(--text-3)' }}>0</span>
@@ -666,7 +663,7 @@ export default function LeaderboardPage() {
                                   fontWeight: 700,
                                 }}
                               >
-                                📑 {t.tab_switch_count} switches
+                                {t.tab_switch_count} switches
                               </span>
                             ) : (
                               <span className="mono" style={{ color: 'var(--text-3)' }}>0</span>
@@ -685,7 +682,7 @@ export default function LeaderboardPage() {
                                 background: statusBg,
                               }}
                             >
-                              {t.integrity_status === 'FLAGGED' ? '🔴 FLAGGED' : t.integrity_status === 'CAUTION' ? '🟡 CAUTION' : '🟢 CLEAN'}
+                              {t.integrity_status}
                             </span>
                           </td>
                           <td>
@@ -720,7 +717,7 @@ export default function LeaderboardPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div>
                 <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gold-bright)' }}>
-                  🛡️ Active Batches & Countdown Timers
+                  Active Batches & Countdown Timers
                 </h3>
                 <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>
                   Manage arena rounds, start timers, and distribute clans and questions.
@@ -959,7 +956,6 @@ export default function LeaderboardPage() {
                       <td>
                         <select
                           className="select"
-                          style={{ height: 30, fontSize: '12px' }}
                           value={t.batch_id ?? ''}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -993,7 +989,7 @@ export default function LeaderboardPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: 10 }}>
                 <div>
                   <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gold-bright)' }}>
-                    ?? Arena Quest Allotment (Batch-Specific Questions)
+                    Arena Quest Allotment (Batch-Specific Questions)
                   </h3>
                   <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>
                     Allot unique problem sets per batch. Contestants only see questions allotted to their batch arena.
@@ -1003,7 +999,6 @@ export default function LeaderboardPage() {
                   <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)' }}>Configure Batch:</label>
                   <select
                     className="select"
-                    style={{ height: 32, fontSize: '13px' }}
                     value={selectedConfigBatchId}
                     onChange={(e) => {
                       const bid = parseInt(e.target.value);
@@ -1080,7 +1075,7 @@ export default function LeaderboardPage() {
                               color: 'var(--gold-bright)',
                             }}
                           >
-                            ⚡ {p.best_time_complexity || 'O(N)'}
+                            {p.best_time_complexity || 'O(N)'}
                           </span>
                         </td>
                         <td>

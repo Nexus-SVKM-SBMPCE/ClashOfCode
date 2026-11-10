@@ -126,7 +126,7 @@ export default function SecurityMonitorPanel({ batches }: { batches: BatchAdminI
                   <td className="num">{r.tab_switches}</td>
                   <td className="num">{r.fullscreen_exits}</td>
                   <td className="num">{r.copy_paste_attempts}</td>
-                  <td><span className={`security-status security-status--${r.status.toLowerCase()}`}>{r.status === 'LOCKED' ? '🔒 Locked' : 'Active'}</span></td>
+                  <td><span className={`security-status security-status--${r.status.toLowerCase()}`}>{r.status === 'LOCKED' ? 'Locked' : 'Active'}</span></td>
                   <td>{fmt(r.last_violation_at)}</td>
                   <td>
                     <button className="btn btn-sm btn-secondary" aria-expanded={isOpen}
@@ -150,7 +150,7 @@ export default function SecurityMonitorPanel({ batches }: { batches: BatchAdminI
               <header className="security-history-head">
                 <h3>Incident history — {p?.team_name ?? p?.display_name} <span className="security-sub">@{p?.username}</span></h3>
                 <span className={`security-status security-status--${(p?.status ?? 'ACTIVE').toLowerCase()}`}>
-                  {p?.status === 'LOCKED' ? `🔒 Locked ${fmt(p.locked_at)}` : 'Active'}
+                  {p?.status === 'LOCKED' ? `Locked ${fmt(p.locked_at)}` : 'Active'}
                 </span>
               </header>
 

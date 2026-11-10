@@ -59,7 +59,7 @@ export default function BatchGate({ children }: BatchGateProps) {
   if (status === 'loading') {
     return (
       <div className="batch-gate-loading" role="status" aria-label="Checking contest status">
-        <span className="batch-gate-spinner" aria-hidden="true">⚡</span>
+        <span className="spinner" aria-hidden="true" />
         <p>Verifying contest status…</p>
       </div>
     );

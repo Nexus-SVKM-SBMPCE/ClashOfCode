@@ -42,7 +42,7 @@ export default function FullscreenGate({ children }: FullscreenGateProps) {
     >
       <div className={`fullscreen-gate-card ${isViolation ? 'fullscreen-gate-card--violation' : ''}`}>
         <div className={`modal-shield-wrap ${isViolation ? 'modal-shield-wrap--violation' : ''}`} aria-hidden="true">
-          <span>{isViolation ? '⚠️' : '🛡️'}</span>
+          <span><Icon name={isViolation ? 'alert' : 'check'} size={28} /></span>
         </div>
 
         {isViolation && (

@@ -10,6 +10,7 @@
  */
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { NOTICE_MIN_READ_SECONDS, strikeCopy } from '../lib/examSecurity';
+import Icon from './Icon';
 
 /** Keep keyboard focus inside the dialog; focus the action once it is usable. */
 function useDialogFocus(actionEnabled = true) {
@@ -32,14 +33,14 @@ function useDialogFocus(actionEnabled = true) {
 }
 
 function Shell({ id, icon, role = 'dialog', title, children, boxRef, onKeyDown, tone }: {
-  id: string; icon: string; role?: 'dialog' | 'alertdialog'; title: string; children: ReactNode;
+  id: string; icon?: ReactNode; role?: 'dialog' | 'alertdialog'; title: string; children: ReactNode;
   boxRef: RefObject<HTMLDivElement | null>; onKeyDown: (e: KeyboardEvent) => void; tone?: 'danger';
 }) {
   return (
     <div className="battle-finished-modal-overlay exam-security-overlay" role={role} aria-modal="true"
       aria-labelledby={`${id}-title`} aria-describedby={`${id}-body`} onKeyDown={onKeyDown}>
       <div ref={boxRef} tabIndex={-1} className={`battle-finished-modal exam-security-modal${tone ? ` exam-security-modal--${tone}` : ''}`}>
-        <div className="modal-shield-wrap"><span className="modal-shield-icon" aria-hidden="true">{icon}</span></div>
+        {icon && <div className="modal-shield-wrap"><span className="modal-shield-icon" aria-hidden="true">{icon}</span></div>}
         <h2 id={`${id}-title`} className="modal-title">{title}</h2>
         {children}
       </div>
@@ -78,13 +79,13 @@ export function ExamSecurityNotice({ onAcknowledge, maxStrikes = 3 }: { onAcknow
   }, [remaining, ready]);
 
   return (
-    <Shell id="exam-notice" icon="🛡️" title="Examination Security Guidelines" boxRef={boxRef} onKeyDown={onKeyDown}>
+    <Shell id="exam-notice" icon={<Icon name="check" size={28} />} title="Examination Security Guidelines" boxRef={boxRef} onKeyDown={onKeyDown}>
       <p className="modal-lead">Before proceeding, please read the following examination rules carefully.</p>
       <div id="exam-notice-body">
         <h3 className="exam-security-subhead">Not allowed during the contest</h3>
         <ul className="exam-security-rules exam-security-rules--deny">
           {NOT_ALLOWED.map((r) => (
-            <li key={r.what}><b>🚫 {r.what}</b><span>{r.detail}</span></li>
+            <li key={r.what}><b>• {r.what}</b><span>{r.detail}</span></li>
           ))}
         </ul>
         <h3 className="exam-security-subhead">How it is enforced</h3>
@@ -114,7 +115,7 @@ export function StrikeWarning({ count, maxStrikes, onReturn }: { count: number; 
   const { boxRef, actionRef, onKeyDown } = useDialogFocus();
   const copy = strikeCopy(count);
   return (
-    <Shell id="strike-warning" icon="⚠️" role="alertdialog" title={copy.title} boxRef={boxRef} onKeyDown={onKeyDown}>
+    <Shell id="strike-warning" icon={<Icon name="alert" size={28} />} role="alertdialog" title={copy.title} boxRef={boxRef} onKeyDown={onKeyDown}>
       <p id="strike-warning-body" className="modal-description">{copy.message}</p>
       <StrikeMeter count={count} max={maxStrikes} />
       <button ref={actionRef} type="button" className="btn btn-primary btn-lg" onClick={onReturn}>
@@ -128,7 +129,7 @@ export function SessionLockedModal({ count, maxStrikes, onSignOut }: { count: nu
   const { boxRef, actionRef, onKeyDown } = useDialogFocus();
   const copy = strikeCopy(maxStrikes);
   return (
-    <Shell id="session-locked" icon="🔒" role="alertdialog" title={copy.title} boxRef={boxRef} onKeyDown={onKeyDown} tone="danger">
+    <Shell id="session-locked" icon={<Icon name="alert" size={28} />} role="alertdialog" title={copy.title} boxRef={boxRef} onKeyDown={onKeyDown} tone="danger">
       <p id="session-locked-body" className="modal-description">{copy.message}</p>
       <StrikeMeter count={Math.max(count, maxStrikes)} max={maxStrikes} />
       <div className="modal-status-badge exam-security-badge">
@@ -144,7 +145,7 @@ export function SessionLockedModal({ count, maxStrikes, onSignOut }: { count: nu
 export function FullscreenRequired({ onEnter, denied }: { onEnter: () => void; denied: boolean }) {
   const { boxRef, actionRef, onKeyDown } = useDialogFocus();
   return (
-    <Shell id="fullscreen-required" icon="🖥️" title="Fullscreen Required" boxRef={boxRef} onKeyDown={onKeyDown}>
+    <Shell id="fullscreen-required" icon={<Icon name="refresh" size={28} />} title="Fullscreen Required" boxRef={boxRef} onKeyDown={onKeyDown}>
       <p id="fullscreen-required-body" className="modal-description">
         The contest must be taken in fullscreen. Press the button below to return to fullscreen and continue.
         {denied && <><br /><b className="exam-security-error">Your browser blocked fullscreen. Allow fullscreen for this site (or press F11) and try again.</b></>}

@@ -6,6 +6,8 @@
  * - Completely non-closable: no close button, backdrop click is inert, locks the arena.
  */
 
+import Icon from './components/Icon';
+
 export default function BattleFinishedModal() {
   return (
     <div
@@ -16,7 +18,7 @@ export default function BattleFinishedModal() {
     >
       <div className="battle-finished-modal">
         <div className="modal-shield-wrap">
-          <span className="modal-shield-icon">⚔️</span>
+          <span className="modal-shield-icon"><Icon name="alert" size={28} /></span>
         </div>
 
         <h2 id="battle-finished-title" className="modal-title">

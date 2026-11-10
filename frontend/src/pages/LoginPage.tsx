@@ -25,15 +25,11 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
-    // Request fullscreen upon user gesture for automatic arena entry
-    if (typeof document !== 'undefined' && document.documentElement?.requestFullscreen) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    }
-
     try {
       await signIn(username, password);
-    } catch {
-      setError('Invalid clan credentials');
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || err.message || 'Invalid clan credentials';
+      setError(typeof msg === 'string' ? msg : 'Invalid clan credentials');
     } finally {
       setLoading(false);
     }
